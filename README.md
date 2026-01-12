@@ -6,15 +6,14 @@ Customised to Pascal.
 
 Increments:
 
-- [ ] Integers
-- [ ] Immediate Constants
+- [X] Integers
 - [ ] Unary Operators
 - [ ] Binary Operators
 - [ ] Variables and Assignment
 - [ ] Booleans and Comparisons
+- [ ] WriteLn("Hello World") (finally)
 - [ ] Branching (if statements)
 - [ ] Loops
-- [ ] WriteLn("Hello World") (finally)
 - [ ] Procedures
 - [ ] Functions
 - [ ] Arrays
