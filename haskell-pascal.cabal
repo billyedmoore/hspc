@@ -39,6 +39,7 @@ library
 
     other-modules:
                     HSPC.Tokenize
+                    HSPC.Parse
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
