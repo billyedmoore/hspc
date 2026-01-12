@@ -1,6 +1,6 @@
 module HSPC.Tokenize (tokenize, HSPCToken (..)) where
 
-import Data.Char (isAlpha, isAlphaNum, isDigit, isSpace)
+import Data.Char (isAlpha, isAlphaNum, isDigit, isSpace, toUpper)
 import Data.Int (Int64)
 import Data.List (isPrefixOf)
 
@@ -20,20 +20,22 @@ tokenize :: String -> [HSPCToken]
 tokenize [] = []
 tokenize (c : cs)
   | "//" `isPrefixOf` (c : cs) = tokenize $ dropWhile (/= '\n') cs
+  -- End includes this annoying '.'
+  | "END." `isPrefixOf` (map toUpper (c : cs)) = EndKeyWordTok : tokenize (drop 3 cs)
   | isSpace c = tokenize cs
   | isDigit c =
       let (num, rest) = span isDigit (c : cs)
        in LiteralIntTok (read num) : tokenize rest
   | isAlpha c =
       let (word, rest) = span isAlphaNum (c : cs)
-       in tokenizeIdentifierOrKeyWord word : tokenize rest
+       in tokenizeIdentifierOrKeyWord (map toUpper word) : tokenize rest
   | otherwise = tokenizeOperator (c : cs)
 
 tokenizeIdentifierOrKeyWord :: String -> HSPCToken
-tokenizeIdentifierOrKeyWord "program" = ProgramKeyWordTok
-tokenizeIdentifierOrKeyWord "begin" = BeginKeyWordTok
-tokenizeIdentifierOrKeyWord "end." = EndKeyWordTok
-tokenizeIdentifierOrKeyWord ident = IdentifierTok ident
+tokenizeIdentifierOrKeyWord "PROGRAM" = ProgramKeyWordTok
+tokenizeIdentifierOrKeyWord "BEGIN" = BeginKeyWordTok
+tokenizeIdentifierOrKeyWord "HALT" = HaltBuiltInTok
+tokenizeIdentifierOrKeyWord s = IdentifierTok s
 
 tokenizeOperator :: String -> [HSPCToken]
 tokenizeOperator (';' : xs) = SemiColonTok : tokenize xs

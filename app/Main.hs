@@ -14,5 +14,8 @@ example =
 main :: IO ()
 main = do
   putStrLn (unlines example)
-  putStrLn (show (compile (unlines example)))
+  let parseResult = compile (unlines example)
+  case parseResult of
+    Right ast -> putStrLn (show ast)
+    Left err -> putStrLn (show err)
   return ()
