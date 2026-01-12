@@ -1,8 +1,18 @@
 module Main (main) where
 
-import qualified MyLib (someFunc)
+import HSPC (compile)
+
+example :: [String]
+example =
+  [ "program CustomExitCode;",
+    "begin",
+    "// this is a comment",
+    "\tHalt(42);",
+    "end."
+  ]
 
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+  putStrLn (unlines example)
+  putStrLn (show (compile (unlines example)))
+  return ()
