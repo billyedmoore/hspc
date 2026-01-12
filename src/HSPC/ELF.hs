@@ -3,16 +3,13 @@
 module HSPC.ELF (getELFheader) where
 
 import Data.Bits (shiftR)
-import Data.Word (Word32, Word64, Word8)
+import Data.Word (Word64, Word8)
 
 getELFheader :: Word64 -> [Word8]
 getELFheader programSize = elfHeader ++ programHeader (120 + programSize)
 
 word64ToLE :: Word64 -> [Word8]
 word64ToLE w = [fromIntegral (w `shiftR` (8 * i)) | i <- [0 .. 7]]
-
-word32ToLE :: Word32 -> [Word8]
-word32ToLE w = [fromIntegral (w `shiftR` (8 * i)) | i <- [0 .. 3]]
 
 elfHeader :: [Word8]
 elfHeader =

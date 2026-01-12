@@ -41,6 +41,7 @@ library
                     HSPC.Tokenize
                     HSPC.Parse
                     HSPC.ELF
+                    HSPC.CodeGen
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -71,6 +72,8 @@ executable hspc
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.21.0.0,
+        bytestring,
+        directory,
         haskell-pascal
 
     -- Directories containing source files.
@@ -104,4 +107,12 @@ test-suite haskell-pascal-test
     -- Test dependencies.
     build-depends:
         base ^>=4.21.0.0,
+        directory,
+        filepath,
+        process,
+        temporary,
+        unix,
+        tasty,
+        tasty-hunit,
+        bytestring,
         haskell-pascal

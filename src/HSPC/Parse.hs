@@ -42,4 +42,6 @@ parseBlockInternal acc xs = do
 parseExpr :: [HSPCToken] -> Either ParseError (AST, [HSPCToken])
 parseExpr
   (HaltBuiltInTok : OpenBracketTok : LiteralIntTok i : CloseBracketTok : SemiColonTok : xs) = Right (Halt i, xs)
+parseExpr
+  (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt 0, xs)
 parseExpr tok = Left $ NotImplemented tok
