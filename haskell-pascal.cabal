@@ -35,16 +35,17 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  MyLib
+    exposed-modules:  HSPC
 
-    -- Modules included in this library but not exported.
-    -- other-modules:
+    other-modules:
+                    HSPC.Tokenize
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.21.0.0
+    build-depends:    base ^>=4.21.0.0,
+                      bytestring
 
     -- Directories containing source files.
     hs-source-dirs:   src
