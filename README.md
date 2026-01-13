@@ -1,13 +1,19 @@
-# Toy Pascal Compiler in Haskell i.e. Haskell Pascal Compiler
+# Haskell Pascal Compiler
 
-Using the incremental approach outlined in
+Toy Pascal compiler written in Haskell using an adapted version of
+the incremental approach outlined in 
 [this paper](http://scheme2006.cs.uchicago.edu/11-ghuloum.pdf).
-Customised to Pascal.
+
+Currently implements a very small (but slowly growing) subset of
+the language.
+
+## Progress
 
 Increments:
 
 - [X] Integers
-- [ ] Operators
+- [ ] Binary Operators on Ints
+- [ ] Unary Operators on Ints
 - [ ] Variables and Assignment
 - [ ] Booleans and Comparisons
 - [ ] WriteLn("Hello World") (finally)
