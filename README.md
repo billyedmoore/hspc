@@ -7,8 +7,7 @@ Customised to Pascal.
 Increments:
 
 - [X] Integers
-- [ ] Unary Operators
-- [ ] Binary Operators
+- [ ] Operators
 - [ ] Variables and Assignment
 - [ ] Booleans and Comparisons
 - [ ] WriteLn("Hello World") (finally)

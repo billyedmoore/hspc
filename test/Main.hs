@@ -19,9 +19,9 @@ data TestSpec = TestSpec
 
 testSuite :: [TestSpec]
 testSuite =
-  [ TestSpec "Return 0" "test/sample_programs/return_one.pas" "/dev/null" 0,
-    TestSpec "Return 255" "test/sample_programs/return_255.pas" "/dev/null" 255,
-    TestSpec "Halt after Halt" "test/sample_programs/halt_after_halt.pas" "/dev/null" 0
+  [ TestSpec "Exit code 0" "test/sample_programs/ints_0_exit_code.pas" "/dev/null" 0,
+    TestSpec "Exit code 255" "test/sample_programs/ints_255_exit_code.pas" "/dev/null" 255,
+    TestSpec "Halt after Halt" "test/sample_programs/ints_halt_after_halt.pas" "/dev/null" 0
   ]
 
 main :: IO ()
