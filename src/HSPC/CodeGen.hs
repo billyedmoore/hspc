@@ -12,8 +12,9 @@ generate ast =
 generateProgram :: AST -> [Word8]
 generateProgram (Program _ body) = concatMap generateProgram body
 generateProgram (Block body) = concatMap generateProgram body
-generateProgram (Halt i) =
+generateProgram (Halt (IntLiteral i)) =
   [0xb8, 0x3c, 00, 00, 00] -- mov eax 60 (sys_exit number)
     ++ [0xbf, fromIntegral i, 00, 00, 00] -- Set exit status to i
     ++ [0x0f, 0x05] -- Syscall
+generateProgram (Halt _) = error "Not implemented."
 generateProgram _ = []

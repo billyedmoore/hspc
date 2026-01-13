@@ -8,13 +8,22 @@ data AST
   | Block [AST]
   | Identifier String
   | IntLiteral Int64
-  | Halt Int64
+  | Add AST AST
+  | IntDivide AST AST
+  | Subtract AST AST
+  | Multiply AST AST
+  | Halt AST
   deriving (Show)
 
 data ParseError
   = MustStartWithProgramStatement
   | ExpectedEndStatement
   | BlockMustStartWithBegin
+  | BracketNotClosed
+  | ExpectedOperand
+  | UnmatchedBracket
+  | UnexpectedToken HSPCToken
+  | ExpectedToken HSPCToken
   | NotImplemented [HSPCToken]
   deriving (Show)
 
@@ -39,9 +48,71 @@ parseBlockInternal acc xs = do
   (expr, rest) <- parseExpr xs
   parseBlockInternal (expr : acc) rest
 
+splitToMatchingBracket :: [HSPCToken] -> Either ParseError ([HSPCToken], [HSPCToken])
+splitToMatchingBracket toks = splitToMatchingBracketInternal toks [] 0
+  where
+    splitToMatchingBracketInternal :: [HSPCToken] -> [HSPCToken] -> Int -> Either ParseError ([HSPCToken], [HSPCToken])
+    splitToMatchingBracketInternal (CloseBracketTok : xs) acc 0 = Right (reverse acc, xs)
+    splitToMatchingBracketInternal (CloseBracketTok : xs) acc i =
+      splitToMatchingBracketInternal xs (CloseBracketTok : acc) (i - 1)
+    splitToMatchingBracketInternal (OpenBracketTok : xs) acc i =
+      splitToMatchingBracketInternal xs (OpenBracketTok : acc) (i + 1)
+    splitToMatchingBracketInternal (x : xs) acc i = splitToMatchingBracketInternal xs (x : acc) i
+    splitToMatchingBracketInternal [] _ _ = Left UnmatchedBracket
+
 parseExpr :: [HSPCToken] -> Either ParseError (AST, [HSPCToken])
 parseExpr
-  (HaltBuiltInTok : OpenBracketTok : LiteralIntTok i : CloseBracketTok : SemiColonTok : xs) = Right (Halt i, xs)
+  (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt (IntLiteral 0), xs)
 parseExpr
-  (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt 0, xs)
+  (HaltBuiltInTok : OpenBracketTok : xs) = do
+    (internal, rawRest) <- splitToMatchingBracket xs
+    rest <- removeSemiColonHead rawRest
+    op <- parseIntOperand internal
+    return (Halt op, rest)
+    where
+      removeSemiColonHead :: [HSPCToken] -> Either ParseError [HSPCToken]
+      removeSemiColonHead (SemiColonTok : rest) = Right rest
+      removeSemiColonHead _ = Left $ ExpectedToken SemiColonTok
 parseExpr tok = Left $ NotImplemented tok
+
+-- IntOperand  = Term { ("+" | "-") Term }
+-- Term        = Factor { ("*" | "div") Factor }
+-- Factor      = Number | "(" Expression ")"
+-- Number      = // an integer
+parseIntOperand :: [HSPCToken] -> Either ParseError AST
+parseIntOperand toks = case break (`elem` [PlusTok, MinusTok]) toks of
+  (before, []) -> parseTerm before
+  (_, [PlusTok]) -> Left ExpectedOperand
+  (before, PlusTok : after) -> do
+    left <- parseTerm before
+    right <- parseTerm after
+    return $ Add left right
+  (_, [MinusTok]) -> Left ExpectedOperand
+  (before, MinusTok : after) -> do
+    left <- parseTerm before
+    right <- parseTerm after
+    return $ Subtract left right
+  _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
+
+parseTerm :: [HSPCToken] -> Either ParseError AST
+parseTerm toks = case break (`elem` [IntDivideTok, MultiplyTok]) toks of
+  (before, []) -> parseFactor before
+  (_, [IntDivideTok]) -> Left ExpectedOperand
+  (before, IntDivideTok : after) -> do
+    left <- parseFactor before
+    right <- parseFactor after
+    return $ IntDivide left right
+  (_, [MultiplyTok]) -> Left ExpectedOperand
+  (before, MultiplyTok : after) -> do
+    left <- parseFactor before
+    right <- parseFactor after
+    return $ Multiply left right
+  _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
+
+parseFactor :: [HSPCToken] -> Either ParseError AST
+parseFactor [LiteralIntTok n] = Right $ IntLiteral n
+parseFactor (OpenBracketTok : xs)
+  | null xs = Left BracketNotClosed
+  | last xs == CloseBracketTok = parseIntOperand (init xs)
+parseFactor (tok : _) = Left $ UnexpectedToken tok
+parseFactor _ = Left ExpectedOperand
