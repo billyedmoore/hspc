@@ -26,8 +26,9 @@ testSuite =
     TestSpec "Exit code 255" "ints_255_exit_code.pas" "/dev/null" 255,
     TestSpec "Halt after Halt" "ints_halt_after_halt.pas" "/dev/null" 0,
     TestSpec "Add literal ints" "operators_add_two_ints.pas" "/dev/null" 200,
-    TestSpec "Multiply literal ints" "operators_multiply_two_ints.pas" "/dev/null" 200,
-    TestSpec "Divide(div) literal ints" "operators_divide_two_ints.pas" "/dev/null" 2
+    TestSpec "Multiply literal ints" "operators_multiply_two_ints.pas" "/dev/null" 40,
+    TestSpec "Divide(div) literal ints" "operators_divide_two_ints.pas" "/dev/null" 2,
+    TestSpec "Brackets with literal ints" "operators_brackets.pas" "/dev/null" 26
   ]
 
 main :: IO ()

@@ -12,7 +12,7 @@ the language.
 Increments:
 
 - [X] Integers
-- [ ] Binary Operators on Ints
+- [X] Binary Operators on Ints
 - [ ] Unary Operators on Ints
 - [ ] Variables and Assignment
 - [ ] Booleans and Comparisons
