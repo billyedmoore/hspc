@@ -48,17 +48,28 @@ parseBlockInternal acc xs = do
   (expr, rest) <- parseExpr xs
   parseBlockInternal (expr : acc) rest
 
-splitToMatchingBracket :: [HSPCToken] -> Either ParseError ([HSPCToken], [HSPCToken])
-splitToMatchingBracket toks = splitToMatchingBracketInternal toks [] 0
+breakLastOuter :: (HSPCToken -> Bool) -> [HSPCToken] -> ([HSPCToken], [HSPCToken])
+breakLastOuter breakCond toks = go (reverse toks) [] 0
   where
-    splitToMatchingBracketInternal :: [HSPCToken] -> [HSPCToken] -> Int -> Either ParseError ([HSPCToken], [HSPCToken])
-    splitToMatchingBracketInternal (CloseBracketTok : xs) acc 0 = Right (reverse acc, xs)
-    splitToMatchingBracketInternal (CloseBracketTok : xs) acc i =
-      splitToMatchingBracketInternal xs (CloseBracketTok : acc) (i - 1)
-    splitToMatchingBracketInternal (OpenBracketTok : xs) acc i =
-      splitToMatchingBracketInternal xs (OpenBracketTok : acc) (i + 1)
-    splitToMatchingBracketInternal (x : xs) acc i = splitToMatchingBracketInternal xs (x : acc) i
-    splitToMatchingBracketInternal [] _ _ = Left UnmatchedBracket
+    go :: [HSPCToken] -> [HSPCToken] -> Int -> ([HSPCToken], [HSPCToken])
+    go [] _ _ = (toks, [])
+    go (CloseBracketTok : rest) acc i = go rest (CloseBracketTok : acc) (i + 1)
+    go (OpenBracketTok : rest) acc i = go rest (OpenBracketTok : acc) (i - 1)
+    go (lastTok : rest) acc 0
+      | breakCond lastTok = (reverse rest, lastTok : acc)
+    go (lastTok : rest) acc i = go rest (lastTok : acc) i
+
+splitToMatchingBracket :: [HSPCToken] -> Either ParseError ([HSPCToken], [HSPCToken])
+splitToMatchingBracket toks = go toks [] 0
+  where
+    go :: [HSPCToken] -> [HSPCToken] -> Int -> Either ParseError ([HSPCToken], [HSPCToken])
+    go (CloseBracketTok : xs) acc 0 = Right (reverse acc, xs)
+    go (CloseBracketTok : xs) acc i =
+      go xs (CloseBracketTok : acc) (i - 1)
+    go (OpenBracketTok : xs) acc i =
+      go xs (OpenBracketTok : acc) (i + 1)
+    go (x : xs) acc i = go xs (x : acc) i
+    go [] _ _ = Left UnmatchedBracket
 
 parseExpr :: [HSPCToken] -> Either ParseError (AST, [HSPCToken])
 parseExpr
@@ -80,39 +91,41 @@ parseExpr tok = Left $ NotImplemented tok
 -- Factor      = Number | "(" Expression ")"
 -- Number      = // an integer
 parseIntOperand :: [HSPCToken] -> Either ParseError AST
-parseIntOperand toks = case break (`elem` [PlusTok, MinusTok]) toks of
+parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
   (before, []) -> parseTerm before
   (_, [PlusTok]) -> Left ExpectedOperand
   (before, PlusTok : after) -> do
-    left <- parseTerm before
+    left <- parseIntOperand before
     right <- parseTerm after
     return $ Add left right
   (_, [MinusTok]) -> Left ExpectedOperand
   (before, MinusTok : after) -> do
-    left <- parseTerm before
+    left <- parseIntOperand before
     right <- parseTerm after
     return $ Subtract left right
   _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
 
 parseTerm :: [HSPCToken] -> Either ParseError AST
-parseTerm toks = case break (`elem` [IntDivideTok, MultiplyTok]) toks of
+parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
   (before, []) -> parseFactor before
   (_, [IntDivideTok]) -> Left ExpectedOperand
   (before, IntDivideTok : after) -> do
-    left <- parseFactor before
+    left <- parseIntOperand before
     right <- parseFactor after
     return $ IntDivide left right
   (_, [MultiplyTok]) -> Left ExpectedOperand
   (before, MultiplyTok : after) -> do
-    left <- parseFactor before
+    left <- parseIntOperand before
     right <- parseFactor after
     return $ Multiply left right
-  _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
+  _ -> error "Should be unreachable since we break on IntDivideTok || MultiplyTok"
 
 parseFactor :: [HSPCToken] -> Either ParseError AST
 parseFactor [LiteralIntTok n] = Right $ IntLiteral n
-parseFactor (OpenBracketTok : xs)
-  | null xs = Left BracketNotClosed
-  | last xs == CloseBracketTok = parseIntOperand (init xs)
+parseFactor (OpenBracketTok : xs) = do
+  (inside, remaining) <- splitToMatchingBracket xs
+  case remaining of
+    [] -> parseIntOperand inside
+    (tok : _) -> Left $ UnexpectedToken tok
 parseFactor (tok : _) = Left $ UnexpectedToken tok
 parseFactor _ = Left ExpectedOperand

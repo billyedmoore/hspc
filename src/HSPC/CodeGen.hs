@@ -1,8 +1,14 @@
 module HSPC.CodeGen (generate) where
 
+import Data.Binary.Put (putInt64le, runPut)
+import Data.ByteString.Lazy qualified as LBS
+import Data.Int (Int64)
 import Data.Word (Word8)
 import HSPC.ELF (getELFheader)
 import HSPC.Parse (AST (..))
+
+int64ToLE :: Int64 -> [Word8]
+int64ToLE n = LBS.unpack $ runPut (putInt64le n)
 
 generate :: AST -> [Word8]
 generate ast =
@@ -12,9 +18,30 @@ generate ast =
 generateProgram :: AST -> [Word8]
 generateProgram (Program _ body) = concatMap generateProgram body
 generateProgram (Block body) = concatMap generateProgram body
-generateProgram (Halt (IntLiteral i)) =
-  [0xb8, 0x3c, 00, 00, 00] -- mov eax 60 (sys_exit number)
-    ++ [0xbf, fromIntegral i, 00, 00, 00] -- Set exit status to i
+generateProgram (Halt ast) =
+  generateProgram ast
+    ++ [0x48, 0x89, 0xc7] -- Copy rax to rdi
+    ++ [0xb8, 0x3c, 00, 00, 00] -- mov rax 60 (sys_exit number)
     ++ [0x0f, 0x05] -- Syscall
-generateProgram (Halt _) = error "Not implemented."
-generateProgram _ = []
+generateProgram (IntLiteral i) =
+  [0x48, 0xb8] ++ int64ToLE i -- movabs rax i
+generateProgram (Add op1 op2) =
+  generateProgram op1
+    ++ [0x50] -- push rax
+    ++ generateProgram op2
+    ++ [0x48, 0x03, 0x04, 0x24] -- add rax [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateProgram (Multiply op1 op2) =
+  generateProgram op1
+    ++ [0x50] -- push rax
+    ++ generateProgram op2
+    ++ [0x48, 0x0f, 0xaf, 0x04, 0x24] -- imul rax [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateProgram (IntDivide op1 op2) =
+  generateProgram op2
+    ++ [0x50] -- push rax
+    ++ generateProgram op1
+    ++ [0x48, 0x99] -- cqo
+    ++ [0x48, 0xf7, 0x3c, 0x24] -- idiv qword [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateProgram ast = error $ "CodeGen for " ++ show ast ++ "Not implemented"
