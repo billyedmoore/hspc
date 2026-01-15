@@ -25,11 +25,14 @@ testSuite :: [TestSpec]
 testSuite =
   [ TestSpec "Exit code 0" "ints_0_exit_code" 0,
     TestSpec "Exit code 255" "ints_255_exit_code" 255,
+    TestSpec "Exit code > 255" "ints_big_exit_code" 255,
     TestSpec "Halt after Halt" "ints_halt_after_halt" 0,
     TestSpec "Add literal ints" "operators_add_two_ints" 200,
     TestSpec "Multiply literal ints" "operators_multiply_two_ints" 40,
     TestSpec "Divide(div) literal ints" "operators_divide_two_ints" 2,
-    TestSpec "Brackets with literal ints" "operators_brackets" 26
+    TestSpec "Brackets with literal ints" "operators_brackets" 26,
+    TestSpec "Unary minus with literal ints" "operators_unary_minus_int" 75,
+    TestSpec "Unary plus with literal ints" "operators_unary_plus_int" 25
   ]
 
 main :: IO ()
