@@ -20,8 +20,12 @@ generateProgram (Program _ body) = concatMap generateProgram body
 generateProgram (Block body) = concatMap generateProgram body
 generateProgram (Halt ast) =
   generateProgram ast
-    ++ [0x48, 0x89, 0xc7] -- Copy rax to rdi
-    ++ [0xb8, 0x3c, 00, 00, 00] -- mov rax 60 (sys_exit number)
+    -- copy rax -> rdi but maxed out at 255
+    ++ [0xbf, 0xff, 0, 0, 0] -- mov edi 255
+    ++ [0x48, 0x3d, 0xff, 0, 0, 0] -- cmp rax 255
+    ++ [0x48, 0x0f, 0x4c, 0xf8] -- cmovl rax rdi
+    -- exit_group syscall, exit code is in rdi
+    ++ [0xb8, 0x3c, 00, 00, 00] -- mov rax 60
     ++ [0x0f, 0x05] -- Syscall
 generateProgram (IntLiteral i) =
   [0x48, 0xb8] ++ int64ToLE i -- movabs rax i
@@ -37,6 +41,10 @@ generateProgram (Multiply op1 op2) =
     ++ generateProgram op2
     ++ [0x48, 0x0f, 0xaf, 0x04, 0x24] -- imul rax [rsp]
     ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateProgram (UnaryPlus op) = generateProgram op -- unary + is a nop
+generateProgram (UnaryMinus op) =
+  generateProgram op
+    ++ [0x48, 0xf7, 0xd8]
 generateProgram (IntDivide op1 op2) =
   generateProgram op2
     ++ [0x50] -- push rax
@@ -44,4 +52,4 @@ generateProgram (IntDivide op1 op2) =
     ++ [0x48, 0x99] -- cqo
     ++ [0x48, 0xf7, 0x3c, 0x24] -- idiv qword [rsp]
     ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
-generateProgram ast = error $ "CodeGen for " ++ show ast ++ "Not implemented"
+generateProgram ast = error $ "CodeGen for " ++ show ast ++ " not implemented"

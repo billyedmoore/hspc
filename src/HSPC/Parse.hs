@@ -8,6 +8,8 @@ data AST
   | Block [AST]
   | Identifier String
   | IntLiteral Int64
+  | UnaryPlus AST
+  | UnaryMinus AST
   | Add AST AST
   | IntDivide AST AST
   | Subtract AST AST
@@ -20,7 +22,7 @@ data ParseError
   | ExpectedEndStatement
   | BlockMustStartWithBegin
   | BracketNotClosed
-  | ExpectedOperand
+  | ExpectedOperand String
   | UnmatchedBracket
   | UnexpectedToken HSPCToken
   | ExpectedToken HSPCToken
@@ -88,17 +90,20 @@ parseExpr tok = Left $ NotImplemented tok
 
 -- IntOperand  = Term { ("+" | "-") Term }
 -- Term        = Factor { ("*" | "div") Factor }
--- Factor      = Number | "(" Expression ")"
+-- Factor      = ("+" | "-") Factor | Number | "(" IntOperand ")"
 -- Number      = // an integer
 parseIntOperand :: [HSPCToken] -> Either ParseError AST
 parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
+  -- starts with +-
+  ([], after) -> parseTerm after
+  -- doesn't contain +-
   (before, []) -> parseTerm before
-  (_, [PlusTok]) -> Left ExpectedOperand
+  (_, [PlusTok]) -> Left $ ExpectedOperand "Expected operand after +"
   (before, PlusTok : after) -> do
     left <- parseIntOperand before
     right <- parseTerm after
     return $ Add left right
-  (_, [MinusTok]) -> Left ExpectedOperand
+  (_, [MinusTok]) -> Left $ ExpectedOperand "Expected operand after -"
   (before, MinusTok : after) -> do
     left <- parseIntOperand before
     right <- parseTerm after
@@ -108,12 +113,12 @@ parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
 parseTerm :: [HSPCToken] -> Either ParseError AST
 parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
   (before, []) -> parseFactor before
-  (_, [IntDivideTok]) -> Left ExpectedOperand
+  (_, [IntDivideTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
   (before, IntDivideTok : after) -> do
     left <- parseIntOperand before
     right <- parseFactor after
     return $ IntDivide left right
-  (_, [MultiplyTok]) -> Left ExpectedOperand
+  (_, [MultiplyTok]) -> Left $ ExpectedOperand "Expected operand after *"
   (before, MultiplyTok : after) -> do
     left <- parseIntOperand before
     right <- parseFactor after
@@ -122,10 +127,16 @@ parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks o
 
 parseFactor :: [HSPCToken] -> Either ParseError AST
 parseFactor [LiteralIntTok n] = Right $ IntLiteral n
+parseFactor (PlusTok : xs) = do
+  operand <- parseFactor xs
+  return $ UnaryPlus operand
+parseFactor (MinusTok : xs) = do
+  operand <- parseFactor xs
+  return $ UnaryMinus operand
 parseFactor (OpenBracketTok : xs) = do
   (inside, remaining) <- splitToMatchingBracket xs
   case remaining of
     [] -> parseIntOperand inside
     (tok : _) -> Left $ UnexpectedToken tok
 parseFactor (tok : _) = Left $ UnexpectedToken tok
-parseFactor _ = Left ExpectedOperand
+parseFactor [] = Left $ ExpectedOperand "Expected operand"
