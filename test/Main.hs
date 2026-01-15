@@ -12,8 +12,9 @@ import Test.Tasty.HUnit
 
 data TestSpec = TestSpec
   { name :: String,
-    srcPath :: FilePath,
-    goldenPath :: FilePath,
+    -- There should be <testName>.pas and <testName>.golden
+    --  in sampleProgramsLocation
+    testName :: FilePath,
     expectedExit :: Int
   }
 
@@ -22,13 +23,13 @@ sampleProgramsLocation = "test/sample_programs/"
 
 testSuite :: [TestSpec]
 testSuite =
-  [ TestSpec "Exit code 0" "ints_0_exit_code.pas" "/dev/null" 0,
-    TestSpec "Exit code 255" "ints_255_exit_code.pas" "/dev/null" 255,
-    TestSpec "Halt after Halt" "ints_halt_after_halt.pas" "/dev/null" 0,
-    TestSpec "Add literal ints" "operators_add_two_ints.pas" "/dev/null" 200,
-    TestSpec "Multiply literal ints" "operators_multiply_two_ints.pas" "/dev/null" 40,
-    TestSpec "Divide(div) literal ints" "operators_divide_two_ints.pas" "/dev/null" 2,
-    TestSpec "Brackets with literal ints" "operators_brackets.pas" "/dev/null" 26
+  [ TestSpec "Exit code 0" "ints_0_exit_code" 0,
+    TestSpec "Exit code 255" "ints_255_exit_code" 255,
+    TestSpec "Halt after Halt" "ints_halt_after_halt" 0,
+    TestSpec "Add literal ints" "operators_add_two_ints" 200,
+    TestSpec "Multiply literal ints" "operators_multiply_two_ints" 40,
+    TestSpec "Divide(div) literal ints" "operators_divide_two_ints" 2,
+    TestSpec "Brackets with literal ints" "operators_brackets" 26
   ]
 
 main :: IO ()
@@ -40,7 +41,7 @@ main =
 
 runIntegrationTest :: TestSpec -> Assertion
 runIntegrationTest spec = do
-  source <- readFile (sampleProgramsLocation ++ srcPath spec)
+  source <- readFile (sampleProgramsLocation ++ testName spec ++ ".pas")
 
   case compile source of
     Left err -> assertFailure $ "Compilation failed: " ++ show err
@@ -56,12 +57,12 @@ runIntegrationTest spec = do
             ExitFailure n -> n
 
       assertEqual
-        ("Exit code mismatch for " ++ srcPath spec ++ "\nStderr: " ++ stderr)
+        ("Exit code mismatch for " ++ testName spec ++ "\nStderr: " ++ stderr)
         (expectedExit spec)
         actualCode
 
-      goldenOut <- readFile (goldenPath spec)
+      goldenOut <- readFile (sampleProgramsLocation ++ testName spec ++ ".golden")
       assertEqual
-        ("StdOut mismatch for " ++ srcPath spec ++ "\nStderr: " ++ stderr)
+        ("StdOut mismatch for " ++ testName spec ++ "\nStderr: " ++ stderr)
         goldenOut
         stdout
