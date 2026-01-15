@@ -24,3 +24,25 @@ Increments:
 - [ ] Arrays
 - [ ] Records
 - [ ] Pointers 
+
+## Testing
+
+HSPC's approach to testing is to test parity with [fpc](https://www.freepascal.org/).
+This is tested with integration tests comparing the `STDOUT` and
+`EXIT_CODE` of compiled versions of the same pascal code
+(one by `hspc` and one by `fpc`).
+
+To rerun the programs against `fpc`.
+
+```bash
+# from project root
+cd test/sample_programs
+bash generate_goldens.bash
+```
+
+To run the tests.
+
+```bash
+# from project root
+cabal test
+```
