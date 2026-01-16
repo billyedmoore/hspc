@@ -32,7 +32,9 @@ testSuite =
     TestSpec "Divide(div) literal ints" "operators_divide_two_ints" 2,
     TestSpec "Brackets with literal ints" "operators_brackets" 26,
     TestSpec "Unary minus with literal ints" "operators_unary_minus_int" 75,
-    TestSpec "Unary plus with literal ints" "operators_unary_plus_int" 25
+    TestSpec "Unary plus with literal ints" "operators_unary_plus_int" 25,
+    TestSpec "{} comments" "comments_curly_brace" 12,
+    TestSpec "// comments" "comments_single_line" 12
   ]
 
 main :: IO ()
