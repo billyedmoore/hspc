@@ -23,6 +23,7 @@ data HSPCToken
 
 tokenize :: String -> [HSPCToken]
 tokenize [] = []
+tokenize ('{' : cs) = tokenize $ dropWhile (/= '}') cs
 tokenize (c : cs)
   | "//" `isPrefixOf` (c : cs) = tokenize $ dropWhile (/= '\n') cs
   -- End includes this annoying '.'
