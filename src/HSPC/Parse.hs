@@ -48,18 +48,18 @@ parse _ = Left MustStartWithProgramStatement
 
 -- Blocks in pascal start with Begin and end with End.
 parseBlock :: [HSPCToken] -> Either ParseError Statement
-parseBlock (BeginKeyWordTok : xs) = do
-  (res, _) <- parseBlockInternal [] xs
+parseBlock (BeginKeyWordTok : tocs) = do
+  (res, _) <- parseBlockInternal [] tocs
   return res
+  where
+    -- Parse a single expression and acc
+    parseBlockInternal :: [Statement] -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
+    parseBlockInternal acc (EndKeyWordTok : xs) = Right (Block (reverse acc), xs)
+    parseBlockInternal _ [] = Left ExpectedEndStatement
+    parseBlockInternal acc xs = do
+      (expr, rest) <- parseStatement xs
+      parseBlockInternal (expr : acc) rest
 parseBlock _ = Left BlockMustStartWithBegin
-
--- Parse a single expression and acc
-parseBlockInternal :: [Statement] -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
-parseBlockInternal acc (EndKeyWordTok : xs) = Right (Block (reverse acc), xs)
-parseBlockInternal _ [] = Left ExpectedEndStatement
-parseBlockInternal acc xs = do
-  (expr, rest) <- parseStatement xs
-  parseBlockInternal (expr : acc) rest
 
 breakLastOuter :: (HSPCToken -> Bool) -> [HSPCToken] -> ([HSPCToken], [HSPCToken])
 breakLastOuter breakCond toks = go (reverse toks) [] 0
