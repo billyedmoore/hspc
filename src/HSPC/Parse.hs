@@ -1,21 +1,32 @@
-module HSPC.Parse (parse, AST (..), ParseError) where
+module HSPC.Parse (parse, Program (..), Statement (..), Expression (..), ParseError) where
 
 import Data.Int (Int64)
 import HSPC.Tokenize (HSPCToken (..))
 
-data AST
-  = Program String [AST]
-  | Block [AST]
-  | Identifier String
+data Program = Program String [Statement]
+  deriving (Show, Eq)
+
+data DataType = Integer Int64
+  deriving (Show, Eq)
+
+data Statement
+  = VarDecl String DataType
+  | VarAssign String Expression
+  | Block [Statement]
+  | Halt Expression
+  | ExprStmt Expression
+  deriving (Show, Eq)
+
+data Expression
+  = Identifier String
   | IntLiteral Int64
-  | UnaryPlus AST
-  | UnaryMinus AST
-  | Add AST AST
-  | IntDivide AST AST
-  | Subtract AST AST
-  | Multiply AST AST
-  | Halt AST
-  deriving (Show)
+  | Add Expression Expression
+  | Subtract Expression Expression
+  | Multiply Expression Expression
+  | IntDivide Expression Expression
+  | UnaryPlus Expression
+  | UnaryMinus Expression
+  deriving (Show, Eq)
 
 data ParseError
   = MustStartWithProgramStatement
@@ -29,25 +40,25 @@ data ParseError
   | NotImplemented [HSPCToken]
   deriving (Show)
 
-parse :: [HSPCToken] -> Either ParseError AST
+parse :: [HSPCToken] -> Either ParseError Program
 parse (ProgramKeyWordTok : IdentifierTok name : SemiColonTok : xs) = do
   block <- parseBlock xs
   Right $ Program name [block]
 parse _ = Left MustStartWithProgramStatement
 
 -- Blocks in pascal start with Begin and end with End.
-parseBlock :: [HSPCToken] -> Either ParseError AST
+parseBlock :: [HSPCToken] -> Either ParseError Statement
 parseBlock (BeginKeyWordTok : xs) = do
   (res, _) <- parseBlockInternal [] xs
   return res
 parseBlock _ = Left BlockMustStartWithBegin
 
 -- Parse a single expression and acc
-parseBlockInternal :: [AST] -> [HSPCToken] -> Either ParseError (AST, [HSPCToken])
+parseBlockInternal :: [Statement] -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
 parseBlockInternal acc (EndKeyWordTok : xs) = Right (Block (reverse acc), xs)
 parseBlockInternal _ [] = Left ExpectedEndStatement
 parseBlockInternal acc xs = do
-  (expr, rest) <- parseExpr xs
+  (expr, rest) <- parseStatement xs
   parseBlockInternal (expr : acc) rest
 
 breakLastOuter :: (HSPCToken -> Bool) -> [HSPCToken] -> ([HSPCToken], [HSPCToken])
@@ -73,10 +84,10 @@ splitToMatchingBracket toks = go toks [] 0
     go (x : xs) acc i = go xs (x : acc) i
     go [] _ _ = Left UnmatchedBracket
 
-parseExpr :: [HSPCToken] -> Either ParseError (AST, [HSPCToken])
-parseExpr
+parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
+parseStatement
   (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt (IntLiteral 0), xs)
-parseExpr
+parseStatement
   (HaltBuiltInTok : OpenBracketTok : xs) = do
     (internal, rawRest) <- splitToMatchingBracket xs
     rest <- removeSemiColonHead rawRest
@@ -86,13 +97,13 @@ parseExpr
       removeSemiColonHead :: [HSPCToken] -> Either ParseError [HSPCToken]
       removeSemiColonHead (SemiColonTok : rest) = Right rest
       removeSemiColonHead _ = Left $ ExpectedToken SemiColonTok
-parseExpr tok = Left $ NotImplemented tok
+parseStatement tok = Left $ NotImplemented tok
 
 -- IntOperand  = Term { ("+" | "-") Term }
 -- Term        = Factor { ("*" | "div") Factor }
 -- Factor      = ("+" | "-") Factor | Number | "(" IntOperand ")"
 -- Number      = // an integer
-parseIntOperand :: [HSPCToken] -> Either ParseError AST
+parseIntOperand :: [HSPCToken] -> Either ParseError Expression
 parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
   -- starts with +-
   ([], after) -> parseTerm after
@@ -110,7 +121,7 @@ parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
     return $ Subtract left right
   _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
 
-parseTerm :: [HSPCToken] -> Either ParseError AST
+parseTerm :: [HSPCToken] -> Either ParseError Expression
 parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
   (before, []) -> parseFactor before
   (_, [IntDivideTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
@@ -125,7 +136,7 @@ parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks o
     return $ Multiply left right
   _ -> error "Should be unreachable since we break on IntDivideTok || MultiplyTok"
 
-parseFactor :: [HSPCToken] -> Either ParseError AST
+parseFactor :: [HSPCToken] -> Either ParseError Expression
 parseFactor [LiteralIntTok n] = Right $ IntLiteral n
 parseFactor (PlusTok : xs) = do
   operand <- parseFactor xs
