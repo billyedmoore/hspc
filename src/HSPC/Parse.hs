@@ -90,6 +90,7 @@ parseVariableDeclarations acc xs = do
   parseVariableDeclarations (expr : acc) rest
 
 parseVariableDeclaration :: [HSPCToken] -> Either ParseError ((String, HSPCDataType), [HSPCToken])
+-- TODO: Handle multiple identifiers seperated by commas
 parseVariableDeclaration (IdentifierTok name : ColonTok : dataTypeToc : xs) = do
   datatype <- toDataType dataTypeToc
   rest <- removeLeadingSemiColon xs
@@ -163,35 +164,35 @@ parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
     right <- parseTerm after
     return $ Subtract left right
   _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
+  where
+    parseTerm :: [HSPCToken] -> Either ParseError Expression
+    parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
+      (before, []) -> parseFactor before
+      (_, [IntDivideTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
+      (before, IntDivideTok : after) -> do
+        left <- parseIntOperand before
+        right <- parseFactor after
+        return $ IntDivide left right
+      (_, [MultiplyTok]) -> Left $ ExpectedOperand "Expected operand after *"
+      (before, MultiplyTok : after) -> do
+        left <- parseIntOperand before
+        right <- parseFactor after
+        return $ Multiply left right
+      _ -> error "Should be unreachable since we break on IntDivideTok || MultiplyTok"
 
-parseTerm :: [HSPCToken] -> Either ParseError Expression
-parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
-  (before, []) -> parseFactor before
-  (_, [IntDivideTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
-  (before, IntDivideTok : after) -> do
-    left <- parseIntOperand before
-    right <- parseFactor after
-    return $ IntDivide left right
-  (_, [MultiplyTok]) -> Left $ ExpectedOperand "Expected operand after *"
-  (before, MultiplyTok : after) -> do
-    left <- parseIntOperand before
-    right <- parseFactor after
-    return $ Multiply left right
-  _ -> error "Should be unreachable since we break on IntDivideTok || MultiplyTok"
-
-parseFactor :: [HSPCToken] -> Either ParseError Expression
-parseFactor [LiteralIntTok n] = Right $ IntLiteral n
-parseFactor [IdentifierTok name] = Right $ Identifier name
-parseFactor (PlusTok : xs) = do
-  operand <- parseFactor xs
-  return $ UnaryPlus operand
-parseFactor (MinusTok : xs) = do
-  operand <- parseFactor xs
-  return $ UnaryMinus operand
-parseFactor (OpenBracketTok : xs) = do
-  (inside, remaining) <- splitToMatchingBracket xs
-  case remaining of
-    [] -> parseIntOperand inside
-    (tok : _) -> Left $ UnexpectedToken tok
-parseFactor (tok : _) = Left $ UnexpectedToken tok
-parseFactor [] = Left $ ExpectedOperand "Expected operand"
+    parseFactor :: [HSPCToken] -> Either ParseError Expression
+    parseFactor [LiteralIntTok n] = Right $ IntLiteral n
+    parseFactor [IdentifierTok name] = Right $ Identifier name
+    parseFactor (PlusTok : xs) = do
+      operand <- parseFactor xs
+      return $ UnaryPlus operand
+    parseFactor (MinusTok : xs) = do
+      operand <- parseFactor xs
+      return $ UnaryMinus operand
+    parseFactor (OpenBracketTok : xs) = do
+      (inside, remaining) <- splitToMatchingBracket xs
+      case remaining of
+        [] -> parseIntOperand inside
+        (tok : _) -> Left $ UnexpectedToken tok
+    parseFactor (tok : _) = Left $ UnexpectedToken tok
+    parseFactor [] = Left $ ExpectedOperand "Expected operand"
