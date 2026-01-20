@@ -7,11 +7,15 @@ import Data.List (isPrefixOf)
 data HSPCToken
   = LiteralIntTok Int64
   | ProgramKeyWordTok
+  | IntegerTypeTok
+  | VarKeyWordTok
   | BeginKeyWordTok
   | EndKeyWordTok
   | HaltBuiltInTok
   | OpenBracketTok
   | CloseBracketTok
+  | AssignmentTok
+  | ColonTok
   | SemiColonTok
   | IntDivideTok
   | PlusTok
@@ -39,12 +43,16 @@ tokenize (c : cs)
 
 tokenizeIdentifierOrKeyWord :: String -> HSPCToken
 tokenizeIdentifierOrKeyWord "PROGRAM" = ProgramKeyWordTok
+tokenizeIdentifierOrKeyWord "VAR" = VarKeyWordTok
 tokenizeIdentifierOrKeyWord "BEGIN" = BeginKeyWordTok
 tokenizeIdentifierOrKeyWord "HALT" = HaltBuiltInTok
 tokenizeIdentifierOrKeyWord "DIV" = IntDivideTok
+tokenizeIdentifierOrKeyWord "INTEGER" = IntegerTypeTok
 tokenizeIdentifierOrKeyWord s = IdentifierTok s
 
 tokenizeOperator :: String -> [HSPCToken]
+tokenizeOperator (':' : '=' : xs) = AssignmentTok : tokenize xs
+tokenizeOperator (':' : xs) = ColonTok : tokenize xs
 tokenizeOperator (';' : xs) = SemiColonTok : tokenize xs
 tokenizeOperator ('(' : xs) = OpenBracketTok : tokenize xs
 tokenizeOperator (')' : xs) = CloseBracketTok : tokenize xs
