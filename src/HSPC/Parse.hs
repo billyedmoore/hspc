@@ -1,18 +1,31 @@
-module HSPC.Parse (parse, Program (..), Statement (..), Expression (..), ParseError) where
+module HSPC.Parse
+  ( parse,
+    Program (..),
+    Block (..),
+    Statement (..),
+    Expression (..),
+    ParseError,
+    HSPCDataType (..),
+  )
+where
 
 import Data.Int (Int64)
 import HSPC.Tokenize (HSPCToken (..))
 
-data Program = Program String [Statement]
+data Program = Program String [Block]
   deriving (Show, Eq)
 
-data DataType = Integer Int64
+data HSPCDataType = IntegerType
+  deriving (Show, Eq)
+
+data Block
+  = -- Block locals body
+    MainProgramBlock [(String, HSPCDataType)] [Statement]
   deriving (Show, Eq)
 
 data Statement
-  = VarDecl String DataType
-  | VarAssign String Expression
-  | Block [Statement]
+  = VarAssign String Expression
+  | Assignment String Expression
   | Halt Expression
   | ExprStmt Expression
   deriving (Show, Eq)
@@ -31,35 +44,57 @@ data Expression
 data ParseError
   = MustStartWithProgramStatement
   | ExpectedEndStatement
-  | BlockMustStartWithBegin
+  | InvalidStartOfBlock
   | BracketNotClosed
+  | ExpectedVariableDeclaration [HSPCToken]
   | ExpectedOperand String
   | UnmatchedBracket
+  | InvalidDataType HSPCToken
   | UnexpectedToken HSPCToken
   | ExpectedToken HSPCToken
   | NotImplemented [HSPCToken]
   deriving (Show)
 
+toDataType :: HSPCToken -> Either ParseError HSPCDataType
+toDataType IntegerTypeTok = Right IntegerType
+toDataType toc = Left $ InvalidDataType toc
+
 parse :: [HSPCToken] -> Either ParseError Program
 parse (ProgramKeyWordTok : IdentifierTok name : SemiColonTok : xs) = do
-  block <- parseBlock xs
+  block <- parseMainProgramBlock xs
   Right $ Program name [block]
 parse _ = Left MustStartWithProgramStatement
 
--- Blocks in pascal start with Begin and end with End.
-parseBlock :: [HSPCToken] -> Either ParseError Statement
-parseBlock (BeginKeyWordTok : tocs) = do
-  (res, _) <- parseBlockInternal [] tocs
-  return res
-  where
-    -- Parse a single expression and acc
-    parseBlockInternal :: [Statement] -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
-    parseBlockInternal acc (EndKeyWordTok : xs) = Right (Block (reverse acc), xs)
-    parseBlockInternal _ [] = Left ExpectedEndStatement
-    parseBlockInternal acc xs = do
-      (expr, rest) <- parseStatement xs
-      parseBlockInternal (expr : acc) rest
-parseBlock _ = Left BlockMustStartWithBegin
+-- Block = {VarSection} "BEGIN" BlockInternal
+-- VarSection = "VAR" {VarDeclaration}
+-- BlockInternal = {Statement} "END."
+parseMainProgramBlock :: [HSPCToken] -> Either ParseError Block
+parseMainProgramBlock (VarKeyWordTok : tocs) = do
+  (vars, rest) <- parseVariableDeclarations [] tocs
+  (res, _) <- parseStatements [] rest
+  return $ MainProgramBlock vars res
+parseMainProgramBlock (BeginKeyWordTok : tocs) = do
+  (res, _) <- parseStatements [] tocs
+  return $ MainProgramBlock [] res
+parseMainProgramBlock _ = Left InvalidStartOfBlock
+
+removeLeadingSemiColon :: [HSPCToken] -> Either ParseError [HSPCToken]
+removeLeadingSemiColon (SemiColonTok : rest) = Right rest
+removeLeadingSemiColon _ = Left $ ExpectedToken SemiColonTok
+
+-- Standard pascal form i.e. cannot be initialized in the var block
+parseVariableDeclarations :: [(String, HSPCDataType)] -> [HSPCToken] -> Either ParseError ([(String, HSPCDataType)], [HSPCToken])
+parseVariableDeclarations acc (BeginKeyWordTok : xs) = Right (reverse acc, xs)
+parseVariableDeclarations acc xs = do
+  (expr, rest) <- parseVariableDeclaration xs
+  parseVariableDeclarations (expr : acc) rest
+
+parseVariableDeclaration :: [HSPCToken] -> Either ParseError ((String, HSPCDataType), [HSPCToken])
+parseVariableDeclaration (IdentifierTok name : ColonTok : dataTypeToc : xs) = do
+  datatype <- toDataType dataTypeToc
+  rest <- removeLeadingSemiColon xs
+  return ((name, datatype), rest)
+parseVariableDeclaration toks = Left $ ExpectedVariableDeclaration toks
 
 breakLastOuter :: (HSPCToken -> Bool) -> [HSPCToken] -> ([HSPCToken], [HSPCToken])
 breakLastOuter breakCond toks = go (reverse toks) [] 0
@@ -84,19 +119,27 @@ splitToMatchingBracket toks = go toks [] 0
     go (x : xs) acc i = go xs (x : acc) i
     go [] _ _ = Left UnmatchedBracket
 
+parseStatements :: [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
+parseStatements acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
+parseStatements _ [] = Left ExpectedEndStatement
+parseStatements acc xs = do
+  (expr, rest) <- parseStatement xs
+  parseStatements (expr : acc) rest
+
 parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
+parseStatement (IdentifierTok name : AssignmentTok : xs) = do
+  let (rhs, rawRest) = break (== SemiColonTok) xs
+  rest <- removeLeadingSemiColon rawRest
+  op <- parseIntOperand rhs
+  return (Assignment name op, rest)
 parseStatement
   (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt (IntLiteral 0), xs)
 parseStatement
   (HaltBuiltInTok : OpenBracketTok : xs) = do
     (internal, rawRest) <- splitToMatchingBracket xs
-    rest <- removeSemiColonHead rawRest
+    rest <- removeLeadingSemiColon rawRest
     op <- parseIntOperand internal
     return (Halt op, rest)
-    where
-      removeSemiColonHead :: [HSPCToken] -> Either ParseError [HSPCToken]
-      removeSemiColonHead (SemiColonTok : rest) = Right rest
-      removeSemiColonHead _ = Left $ ExpectedToken SemiColonTok
 parseStatement tok = Left $ NotImplemented tok
 
 -- IntOperand  = Term { ("+" | "-") Term }
@@ -138,6 +181,7 @@ parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks o
 
 parseFactor :: [HSPCToken] -> Either ParseError Expression
 parseFactor [LiteralIntTok n] = Right $ IntLiteral n
+parseFactor [IdentifierTok name] = Right $ Identifier name
 parseFactor (PlusTok : xs) = do
   operand <- parseFactor xs
   return $ UnaryPlus operand
