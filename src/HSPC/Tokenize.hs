@@ -6,8 +6,10 @@ import Data.List (isPrefixOf)
 
 data HSPCToken
   = LiteralIntTok Int64
+  | LiteralBoolTok Bool
   | ProgramKeyWordTok
   | IntegerTypeTok
+  | BooleanTypeTok
   | VarKeyWordTok
   | BeginKeyWordTok
   | EndKeyWordTok
@@ -48,6 +50,9 @@ tokenizeIdentifierOrKeyWord "BEGIN" = BeginKeyWordTok
 tokenizeIdentifierOrKeyWord "HALT" = HaltBuiltInTok
 tokenizeIdentifierOrKeyWord "DIV" = IntDivideTok
 tokenizeIdentifierOrKeyWord "INTEGER" = IntegerTypeTok
+tokenizeIdentifierOrKeyWord "BOOLEAN" = BooleanTypeTok
+tokenizeIdentifierOrKeyWord "TRUE" = LiteralBoolTok True
+tokenizeIdentifierOrKeyWord "FALSE" = LiteralBoolTok False
 tokenizeIdentifierOrKeyWord s = IdentifierTok s
 
 tokenizeOperator :: String -> [HSPCToken]

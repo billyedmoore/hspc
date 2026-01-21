@@ -13,6 +13,8 @@ type OffsetMap = Map.Map String Int32
 
 dataTypeToSize :: HSPCDataType -> Int
 dataTypeToSize IntegerType = 64
+-- space efficency is clearly a top priority
+dataTypeToSize BooleanType = 64
 
 buildOffsetMap :: [(String, HSPCDataType)] -> (Int32, OffsetMap)
 buildOffsetMap vars = (totalSize, Map.fromList mappedVars)
@@ -72,6 +74,9 @@ generateStatement _ ast = error $ "CodeGen for " ++ show ast ++ " not implemente
 
 generateExpression :: OffsetMap -> Expression -> [Word8]
 generateExpression _ (IntLiteral i) = [0x48, 0xb8] ++ int64ToLE i -- movabs rax i
+generateExpression _ (BoolLiteral b) =
+  [0x48, 0xb8]
+    ++ (int64ToLE . fromIntegral . fromEnum) b -- movabs rax i
 generateExpression offsetMap (Identifier str) =
   case Map.lookup str offsetMap of
     Just offset -> [0x48, 0x8b, 0x85] ++ int32ToLE offset -- mov rax [rbp - n]

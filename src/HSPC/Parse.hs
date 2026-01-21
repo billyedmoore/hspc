@@ -10,12 +10,15 @@ module HSPC.Parse
 where
 
 import Data.Int (Int64)
+import Data.Map qualified as Map
 import HSPC.Tokenize (HSPCToken (..))
 
 data Program = Program String [Block]
   deriving (Show, Eq)
 
-data HSPCDataType = IntegerType
+data HSPCDataType
+  = IntegerType
+  | BooleanType
   deriving (Show, Eq)
 
 data Block
@@ -33,6 +36,7 @@ data Statement
 data Expression
   = Identifier String
   | IntLiteral Int64
+  | BoolLiteral Bool
   | Add Expression Expression
   | Subtract Expression Expression
   | Multiply Expression Expression
@@ -49,14 +53,16 @@ data ParseError
   | ExpectedVariableDeclaration [HSPCToken]
   | ExpectedOperand String
   | UnmatchedBracket
+  | VariableNotDeclared String
   | InvalidDataType HSPCToken
   | UnexpectedToken HSPCToken
   | ExpectedToken HSPCToken
-  | NotImplemented [HSPCToken]
+  | NotImplemented String [HSPCToken]
   deriving (Show)
 
 toDataType :: HSPCToken -> Either ParseError HSPCDataType
 toDataType IntegerTypeTok = Right IntegerType
+toDataType BooleanTypeTok = Right BooleanType
 toDataType toc = Left $ InvalidDataType toc
 
 parse :: [HSPCToken] -> Either ParseError Program
@@ -71,10 +77,10 @@ parse _ = Left MustStartWithProgramStatement
 parseMainProgramBlock :: [HSPCToken] -> Either ParseError Block
 parseMainProgramBlock (VarKeyWordTok : tocs) = do
   (vars, rest) <- parseVariableDeclarations [] tocs
-  (res, _) <- parseStatements [] rest
+  (res, _) <- parseStatements (Map.fromList vars) [] rest
   return $ MainProgramBlock vars res
 parseMainProgramBlock (BeginKeyWordTok : tocs) = do
-  (res, _) <- parseStatements [] tocs
+  (res, _) <- parseStatements Map.empty [] tocs
   return $ MainProgramBlock [] res
 parseMainProgramBlock _ = Left InvalidStartOfBlock
 
@@ -120,35 +126,43 @@ splitToMatchingBracket toks = go toks [] 0
     go (x : xs) acc i = go xs (x : acc) i
     go [] _ _ = Left UnmatchedBracket
 
-parseStatements :: [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
-parseStatements acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
-parseStatements _ [] = Left ExpectedEndStatement
-parseStatements acc xs = do
-  (expr, rest) <- parseStatement xs
-  parseStatements (expr : acc) rest
+parseStatements :: Map.Map String HSPCDataType -> [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
+parseStatements _ acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
+parseStatements _ _ [] = Left ExpectedEndStatement
+parseStatements vars acc xs = do
+  (expr, rest) <- parseStatement vars xs
+  parseStatements vars (expr : acc) rest
 
-parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
-parseStatement (IdentifierTok name : AssignmentTok : xs) = do
+parseStatement :: Map.Map String HSPCDataType -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
+parseStatement varMap (IdentifierTok name : AssignmentTok : xs) = do
   let (rhs, rawRest) = break (== SemiColonTok) xs
   rest <- removeLeadingSemiColon rawRest
-  op <- parseIntOperand rhs
+  op <- case Map.lookup name varMap of
+    Just dt -> parseOperand dt rhs
+    Nothing -> Left $ VariableNotDeclared name
   return (Assignment name op, rest)
 parseStatement
+  _
   (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt (IntLiteral 0), xs)
 parseStatement
+  _
   (HaltBuiltInTok : OpenBracketTok : xs) = do
     (internal, rawRest) <- splitToMatchingBracket xs
     rest <- removeLeadingSemiColon rawRest
-    op <- parseIntOperand internal
+    op <- parseOperand IntegerType internal
     return (Halt op, rest)
-parseStatement tok = Left $ NotImplemented tok
+parseStatement _ tok = Left $ NotImplemented "parseStatement" tok
+
+parseOperand :: HSPCDataType -> [HSPCToken] -> Either ParseError Expression
+parseOperand IntegerType = parseIntOperand
+parseOperand BooleanType = parseBoolOperand
 
 -- IntOperand  = Term { ("+" | "-") Term }
 -- Term        = Factor { ("*" | "div") Factor }
 -- Factor      = ("+" | "-") Factor | Number | "(" IntOperand ")"
 -- Number      = // an integer
 parseIntOperand :: [HSPCToken] -> Either ParseError Expression
-parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
+parseIntOperand tokens = case breakLastOuter (`elem` [PlusTok, MinusTok]) tokens of
   -- starts with +-
   ([], after) -> parseTerm after
   -- doesn't contain +-
@@ -196,3 +210,7 @@ parseIntOperand toks = case breakLastOuter (`elem` [PlusTok, MinusTok]) toks of
         (tok : _) -> Left $ UnexpectedToken tok
     parseFactor (tok : _) = Left $ UnexpectedToken tok
     parseFactor [] = Left $ ExpectedOperand "Expected operand"
+
+parseBoolOperand :: [HSPCToken] -> Either ParseError Expression
+parseBoolOperand [LiteralBoolTok bool] = Right $ BoolLiteral bool
+parseBoolOperand xs = Left $ NotImplemented "parseBoolOperand" xs

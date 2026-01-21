@@ -35,7 +35,8 @@ testSuite =
     TestSpec "Unary plus with literal ints" "operators_unary_plus_int" 25,
     TestSpec "{} comments" "comments_curly_brace" 12,
     TestSpec "// comments" "comments_single_line" 12,
-    TestSpec "Single variable" "variables_single_var" 10
+    TestSpec "Single variable" "variables_single_var" 10,
+    TestSpec "Boolean variable" "variables_bool" 0
   ]
 
 main :: IO ()
