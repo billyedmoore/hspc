@@ -20,6 +20,9 @@ data HSPCToken
   | ColonTok
   | SemiColonTok
   | IntDivideTok
+  | OrTok
+  | AndTok
+  | NotTok
   | PlusTok
   | MinusTok
   | MultiplyTok
@@ -53,6 +56,9 @@ tokenizeIdentifierOrKeyWord "INTEGER" = IntegerTypeTok
 tokenizeIdentifierOrKeyWord "BOOLEAN" = BooleanTypeTok
 tokenizeIdentifierOrKeyWord "TRUE" = LiteralBoolTok True
 tokenizeIdentifierOrKeyWord "FALSE" = LiteralBoolTok False
+tokenizeIdentifierOrKeyWord "OR" = OrTok
+tokenizeIdentifierOrKeyWord "AND" = AndTok
+tokenizeIdentifierOrKeyWord "NOT" = NotTok
 tokenizeIdentifierOrKeyWord s = IdentifierTok s
 
 tokenizeOperator :: String -> [HSPCToken]

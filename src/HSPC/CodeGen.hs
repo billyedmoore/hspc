@@ -104,4 +104,19 @@ generateExpression offsetMap (IntDivide op1 op2) =
     ++ [0x48, 0x99] -- cqo
     ++ [0x48, 0xf7, 0x3c, 0x24] -- idiv qword [rsp]
     ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateExpression offsetMap (BoolOr op1 op2) =
+  generateExpression offsetMap op2
+    ++ [0x50] -- push rax
+    ++ generateExpression offsetMap op1
+    ++ [0x48, 0x0B, 0x04, 0x24] -- or rax, [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateExpression offsetMap (BoolAnd op1 op2) =
+  generateExpression offsetMap op2
+    ++ [0x50] -- push rax
+    ++ generateExpression offsetMap op1
+    ++ [0x48, 0x23, 0x04, 0x24] -- and rax, [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateExpression offsetMap (BoolNot op) =
+  generateExpression offsetMap op
+    ++ [0x48, 0x83, 0xf0, 0x01] -- xor rax, 0x1
 generateExpression _ ast = error $ "CodeGen for " ++ show ast ++ " not implemented"
