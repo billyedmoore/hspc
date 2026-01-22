@@ -15,9 +15,10 @@ Increments:
 - [X] Binary Operators on Ints
 - [X] Unary Operators on Ints
 - [X] Local Variables and Assignment
-- [ ] Booleans and Comparisons
-- [ ] WriteLn("Hello World") (finally)
+- [X] Booleans 
 - [ ] Branching (if statements)
+- [ ] Comparisons
+- [ ] WriteLn("Hello World") (finally)
 - [ ] Loops
 - [ ] Procedures
 - [ ] Functions

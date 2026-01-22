@@ -37,6 +37,9 @@ data Expression
   = Identifier String
   | IntLiteral Int64
   | BoolLiteral Bool
+  | BoolNot Expression
+  | BoolAnd Expression Expression
+  | BoolOr Expression Expression
   | Add Expression Expression
   | Subtract Expression Expression
   | Multiply Expression Expression
@@ -211,6 +214,42 @@ parseIntOperand tokens = case breakLastOuter (`elem` [PlusTok, MinusTok]) tokens
     parseFactor (tok : _) = Left $ UnexpectedToken tok
     parseFactor [] = Left $ ExpectedOperand "Expected operand"
 
+-- BoolOperand = BoolTerm { or BoolTerm }
+-- BoolTerm    = BoolFactor { and BoolFactor }
+-- BoolFactor  = not BoolFactor | BoolPrimary
+-- BoolPrimary = True | False | ( BoolOperand )
 parseBoolOperand :: [HSPCToken] -> Either ParseError Expression
-parseBoolOperand [LiteralBoolTok bool] = Right $ BoolLiteral bool
-parseBoolOperand xs = Left $ NotImplemented "parseBoolOperand" xs
+parseBoolOperand tokens = case breakLastOuter (== OrTok) tokens of
+  (before, []) -> parseBoolTerm before
+  (_, [OrTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
+  (before, OrTok : after) -> do
+    left <- parseBoolTerm before
+    right <- parseBoolTerm after
+    return $ BoolOr left right
+  _ -> error "Should be unreachable since we break on OrTok"
+  where
+    parseBoolTerm :: [HSPCToken] -> Either ParseError Expression
+    parseBoolTerm toks = case breakLastOuter (== AndTok) toks of
+      (before, []) -> parseBoolFactor before
+      (_, [AndTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
+      (before, AndTok : after) -> do
+        left <- parseBoolFactor before
+        right <- parseBoolFactor after
+        return $ BoolAnd left right
+      _ -> error "Should be unreachable since we break on AndTok"
+
+    parseBoolFactor :: [HSPCToken] -> Either ParseError Expression
+    parseBoolFactor (NotTok : op) = do
+      opAsExpr <- parseBoolFactor op
+      return $ BoolNot opAsExpr
+    parseBoolFactor toks = parseBoolPrimary toks
+
+    parseBoolPrimary :: [HSPCToken] -> Either ParseError Expression
+    parseBoolPrimary [LiteralBoolTok bool] = Right $ BoolLiteral bool
+    parseBoolPrimary (OpenBracketTok : xs) = do
+      (inside, remaining) <- splitToMatchingBracket xs
+      case remaining of
+        [] -> parseBoolOperand inside
+        (tok : _) -> Left $ UnexpectedToken tok
+    parseBoolPrimary (tok : _) = Left $ UnexpectedToken tok
+    parseBoolPrimary [] = Left $ ExpectedOperand "Expected boolean operand"
