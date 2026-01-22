@@ -39,7 +39,9 @@ testSuite =
     TestSpec "{} comments" "comments_curly_brace" 12,
     TestSpec "// comments" "comments_single_line" 12,
     TestSpec "Single variable" "variables_single_var" 10,
-    TestSpec "Boolean variable" "variables_bool" 0
+    TestSpec "Boolean variable" "variables_bool" 0,
+    TestSpec "Simple IF" "if_no_else" 30,
+    TestSpec "Simple IF ELSE" "if_else" 40
   ]
 
 main :: IO ()
