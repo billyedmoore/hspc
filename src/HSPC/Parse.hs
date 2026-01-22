@@ -28,6 +28,9 @@ data Block
 
 data Statement
   = VarAssign String Expression
+  | -- if Expression then Statement else Statement;
+    If Expression Statement Statement
+  | NOP
   | Assignment String Expression
   | Halt Expression
   | ExprStmt Expression
@@ -133,27 +136,47 @@ parseStatements :: Map.Map String HSPCDataType -> [Statement] -> [HSPCToken] -> 
 parseStatements _ acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
 parseStatements _ _ [] = Left ExpectedEndStatement
 parseStatements vars acc xs = do
-  (expr, rest) <- parseStatement vars xs
+  (expr, restWithSemiColon) <- parseStatement vars xs
+  rest <- removeLeadingSemiColon restWithSemiColon
   parseStatements vars (expr : acc) rest
 
 parseStatement :: Map.Map String HSPCDataType -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
 parseStatement varMap (IdentifierTok name : AssignmentTok : xs) = do
-  let (rhs, rawRest) = break (== SemiColonTok) xs
-  rest <- removeLeadingSemiColon rawRest
+  let (rhs, rest) = break (`elem` [SemiColonTok, ElseKeyWordTok]) xs
   op <- case Map.lookup name varMap of
     Just dt -> parseOperand dt rhs
     Nothing -> Left $ VariableNotDeclared name
   return (Assignment name op, rest)
 parseStatement
   _
-  (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : SemiColonTok : xs) = Right (Halt (IntLiteral 0), xs)
+  (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : xs) = Right (Halt (IntLiteral 0), xs)
 parseStatement
   _
   (HaltBuiltInTok : OpenBracketTok : xs) = do
-    (internal, rawRest) <- splitToMatchingBracket xs
-    rest <- removeLeadingSemiColon rawRest
+    (internal, rest) <- splitToMatchingBracket xs
     op <- parseOperand IntegerType internal
     return (Halt op, rest)
+
+-- "IF cond THEN statement (; | ELSE elseStatement;)"
+-- ELSE IF is simply an if statement where elseSatement
+-- is another if statement.
+parseStatement varMap (IfKeyWordTok : xs) = do
+  (cond, afterThen) <- parseCond xs
+  (statement, afterStatement) <- parseStatement varMap afterThen
+  case afterStatement of
+    (SemiColonTok : outsideOfStatement) ->
+      return (If cond statement NOP, SemiColonTok : outsideOfStatement)
+    (ElseKeyWordTok : afterElse) -> do
+      (elseStatement, afterElseStatement) <- parseStatement varMap afterElse
+      outsideOfStatement <- removeLeadingSemiColon afterElseStatement
+      return (If cond statement elseStatement, SemiColonTok : outsideOfStatement)
+    _ -> Left $ ExpectedToken SemiColonTok
+  where
+    parseCond :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseCond tokens = do
+      let (condTokens, afterCond) = break (== ThenKeyWordTok) tokens
+      cond <- parseOperand BooleanType condTokens
+      return (cond, drop 1 afterCond)
 parseStatement _ tok = Left $ NotImplemented "parseStatement" tok
 
 parseOperand :: HSPCDataType -> [HSPCToken] -> Either ParseError Expression
