@@ -40,8 +40,10 @@ testSuite =
     TestSpec "// comments" "comments_single_line" 12,
     TestSpec "Single variable" "variables_single_var" 10,
     TestSpec "Boolean variable" "variables_bool" 0,
-    TestSpec "Simple IF" "if_no_else" 30,
-    TestSpec "Simple IF ELSE" "if_else" 40
+    TestSpec "IF" "if_no_else" 30,
+    TestSpec "IF ELSE" "if_else" 40,
+    TestSpec "IF ELSE IF" "if_else_if" 40,
+    TestSpec "IF with complex cond" "if_complex_cond" 40
   ]
 
 main :: IO ()

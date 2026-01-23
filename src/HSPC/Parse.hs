@@ -222,6 +222,7 @@ parseIntOperand tokens = case breakLastOuter (`elem` [PlusTok, MinusTok]) tokens
 
     parseFactor :: [HSPCToken] -> Either ParseError Expression
     parseFactor [LiteralIntTok n] = Right $ IntLiteral n
+    -- TODO: check that this variable exists
     parseFactor [IdentifierTok name] = Right $ Identifier name
     parseFactor (PlusTok : xs) = do
       operand <- parseFactor xs
@@ -269,6 +270,7 @@ parseBoolOperand tokens = case breakLastOuter (== OrTok) tokens of
 
     parseBoolPrimary :: [HSPCToken] -> Either ParseError Expression
     parseBoolPrimary [LiteralBoolTok bool] = Right $ BoolLiteral bool
+    parseBoolPrimary [IdentifierTok name] = Right $ Identifier name
     parseBoolPrimary (OpenBracketTok : xs) = do
       (inside, remaining) <- splitToMatchingBracket xs
       case remaining of
