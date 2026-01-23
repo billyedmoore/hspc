@@ -56,6 +56,18 @@ generateBlock (MainProgramBlock vars body) =
         ++ [0x5d] -- pop rbp
 
 generateStatement :: OffsetMap -> Statement -> [Word8]
+generateStatement _ NOP = []
+generateStatement offsetMap (If cond statement elseStatement) =
+  let statementCode = generateStatement offsetMap statement
+      elseStatementCode = generateStatement offsetMap elseStatement
+   in generateExpression offsetMap cond
+        ++ [0x48, 0x85, 0xc0] -- test rax rax
+        ++ [0x0f, 0x84]
+        ++ int32ToLE (fromIntegral $ length statementCode + 5) -- jz elseStatement
+        ++ statementCode
+        ++ [0xe9]
+        ++ int32ToLE (fromIntegral $ length elseStatementCode) -- jz elseStatementCode
+        ++ elseStatementCode
 generateStatement offsetMap (Halt ast) =
   generateExpression offsetMap ast
     -- copy rax -> rdi but maxed out at 255

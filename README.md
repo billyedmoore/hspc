@@ -16,9 +16,9 @@ Increments:
 - [X] Unary Operators on Ints
 - [X] Local Variables and Assignment
 - [X] Booleans 
-- [ ] Branching (if statements)
-- [ ] Comparisons
+- [X] Branching (if statements)
 - [ ] WriteLn("Hello World") (finally)
+- [ ] Comparisons
 - [ ] Loops
 - [ ] Procedures
 - [ ] Functions
