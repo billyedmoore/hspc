@@ -17,9 +17,11 @@ Increments:
 - [X] Local Variables and Assignment
 - [X] Booleans 
 - [X] Branching (if statements)
-- [ ] WriteLn("Hello World") (finally)
+- [X] While Loops
 - [ ] Comparisons
-- [ ] Loops
+- [ ] Blocks as statements
+- [ ] Strings (WriteLn("Hello World"))
+- [ ] For Loops
 - [ ] Procedures
 - [ ] Functions
 - [ ] Arrays

@@ -43,7 +43,8 @@ testSuite =
     TestSpec "IF" "if_no_else" 30,
     TestSpec "IF ELSE" "if_else" 40,
     TestSpec "IF ELSE IF" "if_else_if" 40,
-    TestSpec "IF with complex cond" "if_complex_cond" 40
+    TestSpec "IF with complex cond" "if_complex_cond" 40,
+    TestSpec "WHILE basic example" "while" 0
   ]
 
 main :: IO ()
