@@ -10,7 +10,6 @@ module HSPC.Parse
 where
 
 import Data.Int (Int64)
-import Data.Map qualified as Map
 import HSPC.Tokenize (HSPCToken (..))
 
 data Program = Program String [Block]
@@ -83,10 +82,10 @@ parse _ = Left MustStartWithProgramStatement
 parseMainProgramBlock :: [HSPCToken] -> Either ParseError Block
 parseMainProgramBlock (VarKeyWordTok : tocs) = do
   (vars, rest) <- parseVariableDeclarations [] tocs
-  (res, _) <- parseStatements (Map.fromList vars) [] rest
+  (res, _) <- parseStatements [] rest
   return $ MainProgramBlock vars res
 parseMainProgramBlock (BeginKeyWordTok : tocs) = do
-  (res, _) <- parseStatements Map.empty [] tocs
+  (res, _) <- parseStatements [] tocs
   return $ MainProgramBlock [] res
 parseMainProgramBlock _ = Left InvalidStartOfBlock
 
@@ -109,17 +108,6 @@ parseVariableDeclaration (IdentifierTok name : ColonTok : dataTypeToc : xs) = do
   return ((name, datatype), rest)
 parseVariableDeclaration toks = Left $ ExpectedVariableDeclaration toks
 
-breakLastOuter :: (HSPCToken -> Bool) -> [HSPCToken] -> ([HSPCToken], [HSPCToken])
-breakLastOuter breakCond toks = go (reverse toks) [] 0
-  where
-    go :: [HSPCToken] -> [HSPCToken] -> Int -> ([HSPCToken], [HSPCToken])
-    go [] _ _ = (toks, [])
-    go (CloseBracketTok : rest) acc i = go rest (CloseBracketTok : acc) (i + 1)
-    go (OpenBracketTok : rest) acc i = go rest (OpenBracketTok : acc) (i - 1)
-    go (lastTok : rest) acc 0
-      | breakCond lastTok = (reverse rest, lastTok : acc)
-    go (lastTok : rest) acc i = go rest (lastTok : acc) i
-
 splitToMatchingBracket :: [HSPCToken] -> Either ParseError ([HSPCToken], [HSPCToken])
 splitToMatchingBracket toks = go toks [] 0
   where
@@ -132,160 +120,147 @@ splitToMatchingBracket toks = go toks [] 0
     go (x : xs) acc i = go xs (x : acc) i
     go [] _ _ = Left UnmatchedBracket
 
-parseStatements :: Map.Map String HSPCDataType -> [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
-parseStatements _ acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
-parseStatements _ _ [] = Left ExpectedEndStatement
-parseStatements vars acc xs = do
-  (expr, restWithSemiColon) <- parseStatement vars xs
+parseStatements :: [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
+parseStatements acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
+parseStatements _ [] = Left ExpectedEndStatement
+parseStatements acc xs = do
+  (expr, restWithSemiColon) <- parseStatement xs
   rest <- removeLeadingSemiColon restWithSemiColon
-  parseStatements vars (expr : acc) rest
+  parseStatements (expr : acc) rest
 
-parseStatement :: Map.Map String HSPCDataType -> [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
-parseStatement varMap (IdentifierTok name : AssignmentTok : xs) = do
+parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
+parseStatement (IdentifierTok name : AssignmentTok : xs) = do
   let (rhs, rest) = break (`elem` [SemiColonTok, ElseKeyWordTok]) xs
-  op <- case Map.lookup name varMap of
-    Just dt -> parseOperand dt rhs
-    Nothing -> Left $ VariableNotDeclared name
+  op <- parseExpression rhs
   return (Assignment name op, rest)
 parseStatement
-  _
   (HaltBuiltInTok : OpenBracketTok : CloseBracketTok : xs) = Right (Halt (IntLiteral 0), xs)
 parseStatement
-  _
   (HaltBuiltInTok : OpenBracketTok : xs) = do
     (internal, rest) <- splitToMatchingBracket xs
-    op <- parseOperand IntegerType internal
+    op <- parseExpression internal
     return (Halt op, rest)
 
 -- "IF cond THEN statement (; | ELSE elseStatement;)"
 -- ELSE IF is simply an if statement where elseSatement
 -- is another if statement.
-parseStatement varMap (IfKeyWordTok : xs) = do
+parseStatement (IfKeyWordTok : xs) = do
   (cond, afterThen) <- parseIfCondition xs
-  (statement, afterStatement) <- parseStatement varMap afterThen
+  (statement, afterStatement) <- parseStatement afterThen
   case afterStatement of
     (SemiColonTok : outsideOfStatement) ->
       return (If cond statement NOP, SemiColonTok : outsideOfStatement)
     (ElseKeyWordTok : afterElse) -> do
-      (elseStatement, afterElseStatement) <- parseStatement varMap afterElse
+      (elseStatement, afterElseStatement) <- parseStatement afterElse
       outsideOfStatement <- removeLeadingSemiColon afterElseStatement
       return (If cond statement elseStatement, SemiColonTok : outsideOfStatement)
     _ -> Left $ ExpectedToken SemiColonTok
   where
     parseIfCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseIfCondition = parseCondition ThenKeyWordTok
-parseStatement varMap (WhileKeyWordTok : xs) = do
+parseStatement (WhileKeyWordTok : xs) = do
   (cond, afterThen) <- parseWhileCondition xs
-  (statement, afterStatement) <- parseStatement varMap afterThen
+  (statement, afterStatement) <- parseStatement afterThen
   outsideOfStatement <- removeLeadingSemiColon afterStatement
   return (While cond statement, SemiColonTok : outsideOfStatement)
   where
     parseWhileCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseWhileCondition = parseCondition DoKeyWordTok
-parseStatement _ tok = Left $ NotImplemented "parseStatement" tok
+parseStatement tok = Left $ NotImplemented "parseStatement" tok
 
 parseCondition :: HSPCToken -> [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
 parseCondition doneTok tokens = do
   let (condTokens, afterCond) = break (== doneTok) tokens
-  cond <- parseOperand BooleanType condTokens
+  cond <- parseExpression condTokens
   return (cond, drop 1 afterCond)
 
-parseOperand :: HSPCDataType -> [HSPCToken] -> Either ParseError Expression
-parseOperand IntegerType = parseIntOperand
-parseOperand BooleanType = parseBoolOperand
-
--- IntOperand  = Term { ("+" | "-") Term }
--- Term        = Factor { ("*" | "div") Factor }
--- Factor      = ("+" | "-") Factor | Number | "(" IntOperand ")"
--- Number      = // an integer
-parseIntOperand :: [HSPCToken] -> Either ParseError Expression
-parseIntOperand tokens = case breakLastOuter (`elem` [PlusTok, MinusTok]) tokens of
-  -- starts with +-
-  ([], after) -> parseTerm after
-  -- doesn't contain +-
-  (before, []) -> parseTerm before
-  (_, [PlusTok]) -> Left $ ExpectedOperand "Expected operand after +"
-  (before, PlusTok : after) -> do
-    left <- parseIntOperand before
-    right <- parseTerm after
-    return $ Add left right
-  (_, [MinusTok]) -> Left $ ExpectedOperand "Expected operand after -"
-  (before, MinusTok : after) -> do
-    left <- parseIntOperand before
-    right <- parseTerm after
-    return $ Subtract left right
-  _ -> error "Should be unreachable since we break on PlusTok || MinusTok"
+-- BoolTerm     = BoolFactor { "and" BoolFactor }
+-- BoolFactor   = "not" BoolFactor | Relation
+-- Relation     = SimpleExpr [ RelOp SimpleExpr ]
+-- SimpleExpr   = Term { AddOp Term }
+-- Term         = Factor { MulOp Factor }
+-- Factor       = + Factor | - Factor | Integer | True | False | "(" Expression ")"
+-- RelOp        = "==" | "!=" | "<" | ">" | "<=" | ">="
+-- AddOp        = "+" | "-"
+-- MulOp        = "*" | "/"
+parseExpression :: [HSPCToken] -> Either ParseError Expression
+parseExpression exprTokens = do
+  (result, remaining) <- parseExpressionInternal exprTokens
+  case remaining of
+    [] -> Right result
+    (tok : _) -> Left $ UnexpectedToken tok
   where
-    parseTerm :: [HSPCToken] -> Either ParseError Expression
-    parseTerm toks = case breakLastOuter (`elem` [IntDivideTok, MultiplyTok]) toks of
-      (before, []) -> parseFactor before
-      (_, [IntDivideTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
-      (before, IntDivideTok : after) -> do
-        left <- parseIntOperand before
-        right <- parseFactor after
-        return $ IntDivide left right
-      (_, [MultiplyTok]) -> Left $ ExpectedOperand "Expected operand after *"
-      (before, MultiplyTok : after) -> do
-        left <- parseIntOperand before
-        right <- parseFactor after
-        return $ Multiply left right
-      _ -> error "Should be unreachable since we break on IntDivideTok || MultiplyTok"
+    parseExpressionInternal :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseExpressionInternal toks = do
+      (left, rest) <- parseBoolTerm toks
+      loopOr left rest
+      where
+        loopOr acc (OrTok : xs) = do
+          (right, rest') <- parseBoolTerm xs
+          loopOr (BoolOr acc right) rest'
+        loopOr acc tokens = Right (acc, tokens)
 
-    parseFactor :: [HSPCToken] -> Either ParseError Expression
-    parseFactor [LiteralIntTok n] = Right $ IntLiteral n
-    -- TODO: check that this variable exists
-    parseFactor [IdentifierTok name] = Right $ Identifier name
+    parseBoolTerm :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseBoolTerm toks = do
+      (left, rest) <- parseBoolFactor toks
+      loopAnd left rest
+      where
+        loopAnd acc (AndTok : xs) = do
+          (right, rest') <- parseBoolFactor xs
+          loopAnd (BoolAnd acc right) rest'
+        loopAnd acc tokens = Right (acc, tokens)
+
+    parseBoolFactor :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseBoolFactor (NotTok : xs) = do
+      (inner, rest) <- parseBoolFactor xs
+      return (BoolNot inner, rest)
+    parseBoolFactor toks = parseRelation toks
+
+    -- TODO: parse relations such as ==, >=, <
+    parseRelation :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseRelation = parseSimpleExpr
+
+    parseSimpleExpr :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseSimpleExpr toks = do
+      (left, rest) <- parseTerm toks
+      loopAdd left rest
+      where
+        loopAdd acc (PlusTok : xs) = do
+          (right, rest') <- parseTerm xs
+          loopAdd (Add acc right) rest'
+        loopAdd acc (MinusTok : xs) = do
+          (right, rest') <- parseTerm xs
+          loopAdd (Subtract acc right) rest'
+        loopAdd acc tokens = Right (acc, tokens)
+
+    parseTerm :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseTerm toks = do
+      (left, rest) <- parseFactor toks
+      loopMul left rest
+      where
+        loopMul acc (MultiplyTok : xs) = do
+          (right, rest') <- parseFactor xs
+          loopMul (Multiply acc right) rest'
+        loopMul acc (IntDivideTok : xs) = do
+          (right, rest') <- parseFactor xs
+          loopMul (IntDivide acc right) rest'
+        loopMul acc tokens = Right (acc, tokens)
+
+    parseFactor :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseFactor (PlusTok : xs) = do
-      operand <- parseFactor xs
-      return $ UnaryPlus operand
+      (inner, rest) <- parseFactor xs
+      return (UnaryPlus inner, rest)
     parseFactor (MinusTok : xs) = do
-      operand <- parseFactor xs
-      return $ UnaryMinus operand
+      (inner, rest) <- parseFactor xs
+      return (UnaryMinus inner, rest)
+    parseFactor (LiteralIntTok n : xs) = Right (IntLiteral n, xs)
+    parseFactor (LiteralBoolTok b : xs) = Right (BoolLiteral b, xs)
+    parseFactor (IdentifierTok name : xs) = Right (Identifier name, xs)
     parseFactor (OpenBracketTok : xs) = do
-      (inside, remaining) <- splitToMatchingBracket xs
-      case remaining of
-        [] -> parseIntOperand inside
+      (expr, rest) <- parseExpressionInternal xs
+      case rest of
+        (CloseBracketTok : final) -> Right (expr, final)
+        [] -> Left $ ExpectedOperand "Expected closing bracket ')'"
         (tok : _) -> Left $ UnexpectedToken tok
-    parseFactor (tok : _) = Left $ UnexpectedToken tok
     parseFactor [] = Left $ ExpectedOperand "Expected operand"
-
--- BoolOperand = BoolTerm { or BoolTerm }
--- BoolTerm    = BoolFactor { and BoolFactor }
--- BoolFactor  = not BoolFactor | BoolPrimary
--- BoolPrimary = True | False | ( BoolOperand )
-parseBoolOperand :: [HSPCToken] -> Either ParseError Expression
-parseBoolOperand tokens = case breakLastOuter (== OrTok) tokens of
-  (before, []) -> parseBoolTerm before
-  (_, [OrTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
-  (before, OrTok : after) -> do
-    left <- parseBoolTerm before
-    right <- parseBoolTerm after
-    return $ BoolOr left right
-  _ -> error "Should be unreachable since we break on OrTok"
-  where
-    parseBoolTerm :: [HSPCToken] -> Either ParseError Expression
-    parseBoolTerm toks = case breakLastOuter (== AndTok) toks of
-      (before, []) -> parseBoolFactor before
-      (_, [AndTok]) -> Left $ ExpectedOperand "Expected operand after 'div'"
-      (before, AndTok : after) -> do
-        left <- parseBoolFactor before
-        right <- parseBoolFactor after
-        return $ BoolAnd left right
-      _ -> error "Should be unreachable since we break on AndTok"
-
-    parseBoolFactor :: [HSPCToken] -> Either ParseError Expression
-    parseBoolFactor (NotTok : op) = do
-      opAsExpr <- parseBoolFactor op
-      return $ BoolNot opAsExpr
-    parseBoolFactor toks = parseBoolPrimary toks
-
-    parseBoolPrimary :: [HSPCToken] -> Either ParseError Expression
-    parseBoolPrimary [LiteralBoolTok bool] = Right $ BoolLiteral bool
-    parseBoolPrimary [IdentifierTok name] = Right $ Identifier name
-    parseBoolPrimary (OpenBracketTok : xs) = do
-      (inside, remaining) <- splitToMatchingBracket xs
-      case remaining of
-        [] -> parseBoolOperand inside
-        (tok : _) -> Left $ UnexpectedToken tok
-    parseBoolPrimary (tok : _) = Left $ UnexpectedToken tok
-    parseBoolPrimary [] = Left $ ExpectedOperand "Expected boolean operand"
+    parseFactor (tok : _) = Left $ UnexpectedToken tok
