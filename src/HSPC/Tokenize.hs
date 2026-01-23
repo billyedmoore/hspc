@@ -13,6 +13,8 @@ data HSPCToken
   | VarKeyWordTok
   | BeginKeyWordTok
   | EndKeyWordTok
+  | WhileKeyWordTok
+  | DoKeyWordTok
   | IfKeyWordTok
   | ElseKeyWordTok
   | ThenKeyWordTok
@@ -52,6 +54,8 @@ tokenize (c : cs)
 tokenizeIdentifierOrKeyWord :: String -> HSPCToken
 tokenizeIdentifierOrKeyWord "PROGRAM" = ProgramKeyWordTok
 tokenizeIdentifierOrKeyWord "VAR" = VarKeyWordTok
+tokenizeIdentifierOrKeyWord "WHILE" = WhileKeyWordTok
+tokenizeIdentifierOrKeyWord "DO" = DoKeyWordTok
 tokenizeIdentifierOrKeyWord "IF" = IfKeyWordTok
 tokenizeIdentifierOrKeyWord "ELSE" = ElseKeyWordTok
 tokenizeIdentifierOrKeyWord "THEN" = ThenKeyWordTok

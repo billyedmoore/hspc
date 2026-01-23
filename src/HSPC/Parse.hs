@@ -28,8 +28,8 @@ data Block
 
 data Statement
   = VarAssign String Expression
-  | -- if Expression then Statement else Statement;
-    If Expression Statement Statement
+  | If Expression Statement Statement
+  | While Expression Statement
   | NOP
   | Assignment String Expression
   | Halt Expression
@@ -161,7 +161,7 @@ parseStatement
 -- ELSE IF is simply an if statement where elseSatement
 -- is another if statement.
 parseStatement varMap (IfKeyWordTok : xs) = do
-  (cond, afterThen) <- parseCond xs
+  (cond, afterThen) <- parseIfCondition xs
   (statement, afterStatement) <- parseStatement varMap afterThen
   case afterStatement of
     (SemiColonTok : outsideOfStatement) ->
@@ -172,12 +172,23 @@ parseStatement varMap (IfKeyWordTok : xs) = do
       return (If cond statement elseStatement, SemiColonTok : outsideOfStatement)
     _ -> Left $ ExpectedToken SemiColonTok
   where
-    parseCond :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
-    parseCond tokens = do
-      let (condTokens, afterCond) = break (== ThenKeyWordTok) tokens
-      cond <- parseOperand BooleanType condTokens
-      return (cond, drop 1 afterCond)
+    parseIfCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseIfCondition = parseCondition ThenKeyWordTok
+parseStatement varMap (WhileKeyWordTok : xs) = do
+  (cond, afterThen) <- parseWhileCondition xs
+  (statement, afterStatement) <- parseStatement varMap afterThen
+  outsideOfStatement <- removeLeadingSemiColon afterStatement
+  return (While cond statement, SemiColonTok : outsideOfStatement)
+  where
+    parseWhileCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseWhileCondition = parseCondition DoKeyWordTok
 parseStatement _ tok = Left $ NotImplemented "parseStatement" tok
+
+parseCondition :: HSPCToken -> [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+parseCondition doneTok tokens = do
+  let (condTokens, afterCond) = break (== doneTok) tokens
+  cond <- parseOperand BooleanType condTokens
+  return (cond, drop 1 afterCond)
 
 parseOperand :: HSPCDataType -> [HSPCToken] -> Either ParseError Expression
 parseOperand IntegerType = parseIntOperand

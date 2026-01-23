@@ -66,8 +66,19 @@ generateStatement offsetMap (If cond statement elseStatement) =
         ++ int32ToLE (fromIntegral $ length statementCode + 5) -- jz elseStatement
         ++ statementCode
         ++ [0xe9]
-        ++ int32ToLE (fromIntegral $ length elseStatementCode) -- jz elseStatementCode
+        ++ int32ToLE (fromIntegral $ length elseStatementCode) -- jmp elseStatementCode
         ++ elseStatementCode
+generateStatement offsetMap (While cond statement) =
+  let condCode = generateExpression offsetMap cond
+      statementCode = generateStatement offsetMap statement
+      jumpToStart = length condCode + length statementCode + 14
+   in condCode
+        ++ [0x48, 0x85, 0xc0] -- test rax rax
+        ++ [0x0f, 0x84]
+        ++ int32ToLE (fromIntegral $ length statementCode + 5) -- jz out of while
+        ++ statementCode
+        ++ [0xe9]
+        ++ int32ToLE (-(fromIntegral jumpToStart)) -- jmp to check
 generateStatement offsetMap (Halt ast) =
   generateExpression offsetMap ast
     -- copy rax -> rdi but maxed out at 255
