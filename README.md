@@ -18,7 +18,7 @@ Increments:
 - [X] Booleans 
 - [X] Branching (if statements)
 - [X] While Loops
-- [ ] Comparisons
+- [X] Comparisons
 - [ ] Blocks as statements
 - [ ] Strings (WriteLn("Hello World"))
 - [ ] For Loops

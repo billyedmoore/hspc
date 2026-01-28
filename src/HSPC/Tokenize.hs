@@ -25,6 +25,12 @@ data HSPCToken
   | ColonTok
   | SemiColonTok
   | IntDivideTok
+  | NotEqualTok
+  | EqualTok
+  | GreaterThanEqualTok
+  | GreaterThanTok
+  | LessThanTok
+  | LessThanEqualTok
   | OrTok
   | AndTok
   | NotTok
@@ -34,6 +40,13 @@ data HSPCToken
   | DivideTok
   | IdentifierTok String
   deriving (Show, Eq)
+
+-- tokenizeOperator ('!' : '=' : xs) = AssignmentTok : tokenize xs
+-- tokenizeOperator ('=' : '=' : xs) = AssignmentTok : tokenize xs
+-- tokenizeOperator ('>' : '=' : xs) = AssignmentTok : tokenize xs
+-- tokenizeOperator ('<' : '=' : xs) = AssignmentTok : tokenize xs
+-- tokenizeOperator ('<' : xs) = AssignmentTok : tokenize xs
+-- tokenizeOperator ('<' : xs) = AssignmentTok : tokenize xs
 
 tokenize :: String -> [HSPCToken]
 tokenize [] = []
@@ -73,6 +86,12 @@ tokenizeIdentifierOrKeyWord s = IdentifierTok s
 
 tokenizeOperator :: String -> [HSPCToken]
 tokenizeOperator (':' : '=' : xs) = AssignmentTok : tokenize xs
+tokenizeOperator ('<' : '>' : xs) = NotEqualTok : tokenize xs
+tokenizeOperator ('>' : '=' : xs) = GreaterThanEqualTok : tokenize xs
+tokenizeOperator ('<' : '=' : xs) = LessThanEqualTok : tokenize xs
+tokenizeOperator ('=' : xs) = EqualTok : tokenize xs
+tokenizeOperator ('>' : xs) = GreaterThanTok : tokenize xs
+tokenizeOperator ('<' : xs) = LessThanTok : tokenize xs
 tokenizeOperator (':' : xs) = ColonTok : tokenize xs
 tokenizeOperator (';' : xs) = SemiColonTok : tokenize xs
 tokenizeOperator ('(' : xs) = OpenBracketTok : tokenize xs
