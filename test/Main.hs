@@ -44,7 +44,12 @@ testSuite =
     TestSpec "IF ELSE" "if_else" 40,
     TestSpec "IF ELSE IF" "if_else_if" 40,
     TestSpec "IF with complex cond" "if_complex_cond" 40,
-    TestSpec "WHILE basic example" "while" 0
+    TestSpec "WHILE basic example" "while" 0,
+    TestSpec "WHILE not equal (<> 10)" "while_not_equal_10" 10,
+    TestSpec "WHILE less than (< 1000)" "while_less_than" 100,
+    TestSpec "Greater than (> and >=)" "comparison_greater_than" 40,
+    TestSpec "Less than (< and <=)" "comparison_less_than" 23,
+    TestSpec "Equality (= and <>)" "comparison_equality" 22
   ]
 
 main :: IO ()

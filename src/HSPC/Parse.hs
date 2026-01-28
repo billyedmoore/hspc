@@ -48,6 +48,12 @@ data Expression
   | IntDivide Expression Expression
   | UnaryPlus Expression
   | UnaryMinus Expression
+  | Equal Expression Expression
+  | NotEqual Expression Expression
+  | GreaterThan Expression Expression
+  | GreaterOrEqualThan Expression Expression
+  | LessThan Expression Expression
+  | LessOrEqualThan Expression Expression
   deriving (Show, Eq)
 
 data ParseError
@@ -216,9 +222,25 @@ parseExpression exprTokens = do
       return (BoolNot inner, rest)
     parseBoolFactor toks = parseRelation toks
 
-    -- TODO: parse relations such as ==, >=, <
     parseRelation :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
-    parseRelation = parseSimpleExpr
+    parseRelation toks = do
+      parseSimpleExpr toks >>= handleOperatorAndRight
+      where
+        handleOperatorAndRight (left, op : xs)
+          | Just constructor <- matchOpTokenToOperator op = do
+              (right, rest) <- parseSimpleExpr xs
+              Right (constructor left right, rest)
+        -- no comparison operator
+        handleOperatorAndRight (left, rest) = Right (left, rest)
+
+        matchOpTokenToOperator :: HSPCToken -> Maybe (Expression -> Expression -> Expression)
+        matchOpTokenToOperator EqualTok = Just Equal
+        matchOpTokenToOperator NotEqualTok = Just NotEqual
+        matchOpTokenToOperator GreaterThanTok = Just GreaterThan
+        matchOpTokenToOperator GreaterThanEqualTok = Just GreaterOrEqualThan
+        matchOpTokenToOperator LessThanTok = Just LessThan
+        matchOpTokenToOperator LessThanEqualTok = Just LessOrEqualThan
+        matchOpTokenToOperator _ = Nothing
 
     parseSimpleExpr :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseSimpleExpr toks = do

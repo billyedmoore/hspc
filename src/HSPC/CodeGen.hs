@@ -95,6 +95,16 @@ generateStatement offsetMap (Assignment name op) =
       Nothing -> error $ "Variable " ++ name ++ " doesn't exist."
 generateStatement _ ast = error $ "CodeGen for " ++ show ast ++ " not implemented"
 
+generateComparison :: OffsetMap -> Expression -> Expression -> Word8 -> [Word8]
+generateComparison offsetMap op1 op2 condByte =
+  generateExpression offsetMap op2
+    ++ [0x50] -- push rax
+    ++ generateExpression offsetMap op1
+    ++ [0x48, 0x3b, 0x04, 0x24] -- cmp rax, [rsp]  (op1 vs op2)
+    ++ [0x0f, condByte, 0xc0] -- set{cond} al
+    ++ [0x48, 0x0f, 0xb6, 0xc0] -- movzx rax, al
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp, 8 (release stack space)
+
 generateExpression :: OffsetMap -> Expression -> [Word8]
 generateExpression _ (IntLiteral i) = [0x48, 0xb8] ++ int64ToLE i -- movabs rax i
 generateExpression _ (BoolLiteral b) =
@@ -116,6 +126,12 @@ generateExpression offsetMap (Multiply op1 op2) =
     ++ generateExpression offsetMap op2
     ++ [0x48, 0x0f, 0xaf, 0x04, 0x24] -- imul rax [rsp]
     ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp 8 (release stack space)
+generateExpression offsetMap (Equal op1 op2) = generateComparison offsetMap op1 op2 0x94
+generateExpression offsetMap (NotEqual op1 op2) = generateComparison offsetMap op1 op2 0x95
+generateExpression offsetMap (GreaterThan op1 op2) = generateComparison offsetMap op1 op2 0x9f
+generateExpression offsetMap (GreaterOrEqualThan op1 op2) = generateComparison offsetMap op1 op2 0x9d
+generateExpression offsetMap (LessThan op1 op2) = generateComparison offsetMap op1 op2 0x9c
+generateExpression offsetMap (LessOrEqualThan op1 op2) = generateComparison offsetMap op1 op2 0x9e
 generateExpression offsetMap (UnaryPlus op) = generateExpression offsetMap op -- unary + is a nop
 generateExpression offsetMap (UnaryMinus op) =
   generateExpression offsetMap op
