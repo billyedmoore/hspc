@@ -12,7 +12,7 @@ data HSPCToken
   | BooleanTypeTok
   | VarKeyWordTok
   | BeginKeyWordTok
-  | EndKeyWordTok
+  | ProgramEndKeyWordTok
   | WhileKeyWordTok
   | DoKeyWordTok
   | IfKeyWordTok
@@ -54,7 +54,7 @@ tokenize ('{' : cs) = tokenize $ dropWhile (/= '}') cs
 tokenize (c : cs)
   | "//" `isPrefixOf` (c : cs) = tokenize $ dropWhile (/= '\n') cs
   -- End includes this annoying '.'
-  | "END." `isPrefixOf` map toUpper (c : cs) = EndKeyWordTok : tokenize (drop 3 cs)
+  | "END." `isPrefixOf` map toUpper (c : cs) = ProgramEndKeyWordTok : tokenize (drop 3 cs)
   | isSpace c = tokenize cs
   | isDigit c =
       let (num, rest) = span isDigit (c : cs)

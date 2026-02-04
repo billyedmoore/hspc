@@ -32,6 +32,7 @@ data Statement
   | NOP
   | Assignment String Expression
   | Halt Expression
+  | StatementBlock [Statement]
   | ExprStmt Expression
   deriving (Show, Eq)
 
@@ -88,10 +89,10 @@ parse _ = Left MustStartWithProgramStatement
 parseMainProgramBlock :: [HSPCToken] -> Either ParseError Block
 parseMainProgramBlock (VarKeyWordTok : tocs) = do
   (vars, rest) <- parseVariableDeclarations [] tocs
-  (res, _) <- parseStatements [] rest
+  (res, _) <- parseStatements ProgramEndKeyWordTok [] rest
   return $ MainProgramBlock vars res
 parseMainProgramBlock (BeginKeyWordTok : tocs) = do
-  (res, _) <- parseStatements [] tocs
+  (res, _) <- parseStatements ProgramEndKeyWordTok [] tocs
   return $ MainProgramBlock [] res
 parseMainProgramBlock _ = Left InvalidStartOfBlock
 
@@ -126,13 +127,14 @@ splitToMatchingBracket toks = go toks [] 0
     go (x : xs) acc i = go xs (x : acc) i
     go [] _ _ = Left UnmatchedBracket
 
-parseStatements :: [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
-parseStatements acc (EndKeyWordTok : xs) = Right (reverse acc, xs)
-parseStatements _ [] = Left ExpectedEndStatement
-parseStatements acc xs = do
+parseStatements :: HSPCToken -> [Statement] -> [HSPCToken] -> Either ParseError ([Statement], [HSPCToken])
+parseStatements endTok acc (x : xs)
+  | x == endTok = Right (reverse acc, xs)
+parseStatements _ _ [] = Left ExpectedEndStatement
+parseStatements endTok acc xs = do
   (expr, restWithSemiColon) <- parseStatement xs
   rest <- removeLeadingSemiColon restWithSemiColon
-  parseStatements (expr : acc) rest
+  parseStatements endTok (expr : acc) rest
 
 parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
 parseStatement (IdentifierTok name : AssignmentTok : xs) = do
