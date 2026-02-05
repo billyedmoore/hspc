@@ -114,6 +114,12 @@ generateExpression offsetMap (Identifier str) =
   case Map.lookup str offsetMap of
     Just offset -> [0x48, 0x8b, 0x85] ++ int32ToLE offset -- mov rax [rbp - n]
     Nothing -> error $ "Variable " ++ str ++ " doesn't exist."
+generateExpression offsetMap (Subtract op1 op2) =
+  generateExpression offsetMap op2
+    ++ [0x50] -- push rax
+    ++ generateExpression offsetMap op1
+    ++ [0x48, 0x2b, 0x04, 0x24] -- sub rax, [rsp]
+    ++ [0x48, 0x83, 0xc4, 0x08] -- add rsp, 8 (release stack space)
 generateExpression offsetMap (Add op1 op2) =
   generateExpression offsetMap op1
     ++ [0x50] -- push rax

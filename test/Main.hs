@@ -28,6 +28,7 @@ testSuite =
     TestSpec "Exit code > 255" "ints_big_exit_code" 255,
     TestSpec "Halt after Halt" "ints_halt_after_halt" 0,
     TestSpec "Add literal ints" "operators_add_two_ints" 200,
+    TestSpec "Subtract literal ints" "operators_sub_two_ints" 90,
     TestSpec "Multiply literal ints" "operators_multiply_two_ints" 40,
     TestSpec "Divide(div) literal ints" "operators_divide_two_ints" 2,
     TestSpec "Brackets with literal ints" "operators_brackets" 26,
