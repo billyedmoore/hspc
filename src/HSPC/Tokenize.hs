@@ -12,6 +12,7 @@ data HSPCToken
   | BooleanTypeTok
   | VarKeyWordTok
   | BeginKeyWordTok
+  | EndKeyWordTok
   | ProgramEndKeyWordTok
   | WhileKeyWordTok
   | DoKeyWordTok
@@ -73,6 +74,7 @@ tokenizeIdentifierOrKeyWord "IF" = IfKeyWordTok
 tokenizeIdentifierOrKeyWord "ELSE" = ElseKeyWordTok
 tokenizeIdentifierOrKeyWord "THEN" = ThenKeyWordTok
 tokenizeIdentifierOrKeyWord "BEGIN" = BeginKeyWordTok
+tokenizeIdentifierOrKeyWord "END" = EndKeyWordTok
 tokenizeIdentifierOrKeyWord "HALT" = HaltBuiltInTok
 tokenizeIdentifierOrKeyWord "DIV" = IntDivideTok
 tokenizeIdentifierOrKeyWord "INTEGER" = IntegerTypeTok

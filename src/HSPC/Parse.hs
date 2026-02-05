@@ -148,6 +148,9 @@ parseStatement
     (internal, rest) <- splitToMatchingBracket xs
     op <- parseExpression internal
     return (Halt op, rest)
+parseStatement (BeginKeyWordTok : xs) = do
+  (stmts, rest) <- parseStatements EndKeyWordTok [] xs
+  return (StatementBlock stmts, rest)
 
 -- "IF cond THEN statement (; | ELSE elseStatement;)"
 -- ELSE IF is simply an if statement where elseSatement

@@ -88,6 +88,8 @@ generateStatement offsetMap (Halt ast) =
     -- exit_group syscall, exit code is in rdi
     ++ [0xb8, 0x3c, 00, 00, 00] -- mov rax 60
     ++ [0x0f, 0x05] -- Syscall
+generateStatement offsetMap (StatementBlock body) =
+  concatMap (generateStatement offsetMap) body
 generateStatement offsetMap (Assignment name op) =
   generateExpression offsetMap op
     ++ case Map.lookup name offsetMap of
@@ -164,4 +166,3 @@ generateExpression offsetMap (BoolAnd op1 op2) =
 generateExpression offsetMap (BoolNot op) =
   generateExpression offsetMap op
     ++ [0x48, 0x83, 0xf0, 0x01] -- xor rax, 0x1
-generateExpression _ ast = error $ "CodeGen for " ++ show ast ++ " not implemented"

@@ -19,9 +19,10 @@ Increments:
 - [X] Branching (if statements)
 - [X] While Loops
 - [X] Comparisons
-- [ ] Blocks as statements
-- [ ] Strings (WriteLn("Hello World"))
+- [X] Blocks as statements
 - [ ] For Loops
+- [ ] Strings (WriteLn("Hello World"))
+- [ ] Type Checking
 - [ ] Procedures
 - [ ] Functions
 - [ ] Arrays
