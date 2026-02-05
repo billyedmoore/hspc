@@ -14,6 +14,9 @@ data HSPCToken
   | BeginKeyWordTok
   | EndKeyWordTok
   | ProgramEndKeyWordTok
+  | ForKeyWordTok
+  | ToKeyWordTok
+  | DownToKeyWordTok
   | WhileKeyWordTok
   | DoKeyWordTok
   | IfKeyWordTok
@@ -54,7 +57,7 @@ tokenize [] = []
 tokenize ('{' : cs) = tokenize $ dropWhile (/= '}') cs
 tokenize (c : cs)
   | "//" `isPrefixOf` (c : cs) = tokenize $ dropWhile (/= '\n') cs
-  -- End includes this annoying '.'
+  -- Program end includes this annoying '.'
   | "END." `isPrefixOf` map toUpper (c : cs) = ProgramEndKeyWordTok : tokenize (drop 3 cs)
   | isSpace c = tokenize cs
   | isDigit c =
@@ -68,6 +71,9 @@ tokenize (c : cs)
 tokenizeIdentifierOrKeyWord :: String -> HSPCToken
 tokenizeIdentifierOrKeyWord "PROGRAM" = ProgramKeyWordTok
 tokenizeIdentifierOrKeyWord "VAR" = VarKeyWordTok
+tokenizeIdentifierOrKeyWord "FOR" = ForKeyWordTok
+tokenizeIdentifierOrKeyWord "DOWNTO" = DownToKeyWordTok
+tokenizeIdentifierOrKeyWord "TO" = ToKeyWordTok
 tokenizeIdentifierOrKeyWord "WHILE" = WhileKeyWordTok
 tokenizeIdentifierOrKeyWord "DO" = DoKeyWordTok
 tokenizeIdentifierOrKeyWord "IF" = IfKeyWordTok

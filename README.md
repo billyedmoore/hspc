@@ -20,12 +20,13 @@ Increments:
 - [X] While Loops
 - [X] Comparisons
 - [X] Blocks as statements
-- [ ] For Loops
+- [X] For Loops
 - [ ] Strings (WriteLn("Hello World"))
 - [ ] Type Checking
 - [ ] Procedures
 - [ ] Functions
 - [ ] Arrays
+- [ ] Floats
 - [ ] Records
 - [ ] Pointers 
 
