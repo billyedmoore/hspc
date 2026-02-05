@@ -6,6 +6,7 @@ module HSPC.Parse
     Expression (..),
     ParseError,
     HSPCDataType (..),
+    ForDirection (..),
   )
 where
 
@@ -25,10 +26,17 @@ data Block
     MainProgramBlock [(String, HSPCDataType)] [Statement]
   deriving (Show, Eq)
 
+data ForDirection
+  = Up
+  | Down
+  deriving (Show, Eq)
+
 data Statement
   = VarAssign String Expression
   | If Expression Statement Statement
   | While Expression Statement
+  | -- For {Dir} {Assignment} {FinalValue} {Statement}
+    For ForDirection Statement Expression Statement
   | NOP
   | Assignment String Expression
   | Halt Expression
@@ -63,12 +71,13 @@ data ParseError
   | InvalidStartOfBlock
   | BracketNotClosed
   | ExpectedVariableDeclaration [HSPCToken]
+  | ExpectedVariableAssignment
   | ExpectedOperand String
   | UnmatchedBracket
   | VariableNotDeclared String
   | InvalidDataType HSPCToken
   | UnexpectedToken HSPCToken
-  | ExpectedToken HSPCToken
+  | ExpectedToken [HSPCToken]
   | NotImplemented String [HSPCToken]
   deriving (Show)
 
@@ -97,8 +106,12 @@ parseMainProgramBlock (BeginKeyWordTok : tocs) = do
 parseMainProgramBlock _ = Left InvalidStartOfBlock
 
 removeLeadingSemiColon :: [HSPCToken] -> Either ParseError [HSPCToken]
-removeLeadingSemiColon (SemiColonTok : rest) = Right rest
-removeLeadingSemiColon _ = Left $ ExpectedToken SemiColonTok
+removeLeadingSemiColon = removeLeadingTok SemiColonTok
+
+removeLeadingTok :: HSPCToken -> [HSPCToken] -> Either ParseError [HSPCToken]
+removeLeadingTok tok (h : rest)
+  | h == tok = Right rest
+removeLeadingTok tok _ = Left $ ExpectedToken [tok]
 
 -- Standard pascal form i.e. cannot be initialized in the var block
 parseVariableDeclarations :: [(String, HSPCDataType)] -> [HSPCToken] -> Either ParseError ([(String, HSPCDataType)], [HSPCToken])
@@ -138,7 +151,7 @@ parseStatements endTok acc xs = do
 
 parseStatement :: [HSPCToken] -> Either ParseError (Statement, [HSPCToken])
 parseStatement (IdentifierTok name : AssignmentTok : xs) = do
-  let (rhs, rest) = break (`elem` [SemiColonTok, ElseKeyWordTok]) xs
+  let (rhs, rest) = break (`elem` [SemiColonTok, ElseKeyWordTok, DownToKeyWordTok, ToKeyWordTok]) xs
   op <- parseExpression rhs
   return (Assignment name op, rest)
 parseStatement
@@ -165,7 +178,7 @@ parseStatement (IfKeyWordTok : xs) = do
       (elseStatement, afterElseStatement) <- parseStatement afterElse
       outsideOfStatement <- removeLeadingSemiColon afterElseStatement
       return (If cond statement elseStatement, SemiColonTok : outsideOfStatement)
-    _ -> Left $ ExpectedToken SemiColonTok
+    _ -> Left $ ExpectedToken [SemiColonTok]
   where
     parseIfCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseIfCondition = parseCondition ThenKeyWordTok
@@ -177,6 +190,30 @@ parseStatement (WhileKeyWordTok : xs) = do
   where
     parseWhileCondition :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
     parseWhileCondition = parseCondition DoKeyWordTok
+parseStatement (ForKeyWordTok : xs) = do
+  (assign, afterAssign) <- parseStatement xs
+  assertAssignment assign
+  (dir, afterTo) <- popDirection afterAssign
+  (cond, afterDo) <- parseCond afterTo
+  (statement, afterStatement) <- parseStatement afterDo
+  outsideOfStatement <- removeLeadingSemiColon afterStatement
+  return
+    ( For dir assign cond statement,
+      SemiColonTok : outsideOfStatement
+    )
+  where
+    parseCond :: [HSPCToken] -> Either ParseError (Expression, [HSPCToken])
+    parseCond = parseCondition DoKeyWordTok
+
+    popDirection :: [HSPCToken] -> Either ParseError (ForDirection, [HSPCToken])
+    popDirection (ToKeyWordTok : rest) = Right (Up, rest)
+    popDirection (DownToKeyWordTok : rest) = Right (Down, rest)
+    popDirection (t : _) = Left $ UnexpectedToken t
+    popDirection _ = Left $ ExpectedToken [ToKeyWordTok, DownToKeyWordTok]
+
+    assertAssignment :: Statement -> Either ParseError ()
+    assertAssignment (Assignment _ _) = Right ()
+    assertAssignment _ = Left ExpectedVariableAssignment
 parseStatement tok = Left $ NotImplemented "parseStatement" tok
 
 parseCondition :: HSPCToken -> [HSPCToken] -> Either ParseError (Expression, [HSPCToken])

@@ -7,7 +7,14 @@ import Data.List (mapAccumL)
 import Data.Map qualified as Map
 import Data.Word (Word8)
 import HSPC.ELF (getELFheader)
-import HSPC.Parse (Block (MainProgramBlock), Expression (..), HSPCDataType (..), Program (..), Statement (..))
+import HSPC.Parse
+  ( Block (MainProgramBlock),
+    Expression (..),
+    ForDirection (..),
+    HSPCDataType (..),
+    Program (..),
+    Statement (..),
+  )
 
 type OffsetMap = Map.Map String Int32
 
@@ -79,6 +86,26 @@ generateStatement offsetMap (While cond statement) =
         ++ statementCode
         ++ [0xe9]
         ++ int32ToLE (-(fromIntegral jumpToStart)) -- jmp to check
+generateStatement offsetMap (For dir assign@(Assignment name _) target statement) =
+  let assignCode = generateStatement offsetMap assign
+      condCode = generateExpression offsetMap $ buildCond dir name target
+      statementCode = generateStatement offsetMap statement
+      incrI = if dir == Up then 1 else -1
+      incrCode = generateStatement offsetMap (Assignment name (Add (Identifier name) (IntLiteral incrI)))
+      distToStart = length condCode + length statementCode + length incrCode + 14
+   in assignCode
+        ++ condCode
+        ++ [0x48, 0x85, 0xc0] -- test rax rax
+        ++ [0x0f, 0x84]
+        ++ int32ToLE (fromIntegral $ length statementCode + length incrCode + 5) -- break if not cond
+        ++ statementCode
+        ++ incrCode
+        ++ [0xe9]
+        ++ int32ToLE (-(fromIntegral distToStart)) -- jmp to check
+  where
+    buildCond :: ForDirection -> String -> Expression -> Expression
+    buildCond Up varName targetVal = LessOrEqualThan (Identifier varName) targetVal
+    buildCond Down varName targetVal = GreaterOrEqualThan (Identifier varName) targetVal
 generateStatement offsetMap (Halt ast) =
   generateExpression offsetMap ast
     -- copy rax -> rdi but maxed out at 255
