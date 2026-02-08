@@ -70,6 +70,8 @@ data ParseError
   | ExpectedEndStatement
   | InvalidStartOfBlock
   | BracketNotClosed
+  | -- TypeCheckError Expected Got
+    TypeCheckError HSPCDataType HSPCDataType
   | ExpectedVariableDeclaration [HSPCToken]
   | ExpectedVariableAssignment
   | ExpectedOperand String

@@ -21,8 +21,8 @@ Increments:
 - [X] Comparisons
 - [X] Blocks as statements
 - [X] For Loops
-- [ ] Strings (WriteLn("Hello World"))
 - [ ] Type Checking
+- [ ] Strings (WriteLn("Hello World"))
 - [ ] Procedures
 - [ ] Functions
 - [ ] Arrays
